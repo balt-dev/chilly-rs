@@ -1,0 +1,11 @@
+workspace = { members = ["crates/parser", "crates/structures"] }
+
+[package]
+name = "chilly-rs"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+parser = {path = "crates/parser"}

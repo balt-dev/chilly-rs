@@ -1,0 +1,27 @@
+scene = {SOI ~ flags ~ tilemap ~ EOI}
+
+flags = {(flag ~ ws+)* ~ flag?}
+flag = {"-" ~ "-"? ~ flag_name ~ ("=" ~ flag_arg)?}
+
+tilemap = {((row ~ "\n")* ~ row)?}
+row = {((stack ~ " "+)* ~ stack)?}
+stack = {((anim ~ "&")* ~ anim)?}
+anim = {((cell ~ ">")* ~ cell)?}
+cell = {(object ~ variants)?}
+
+object = _{tile}
+
+tile = {value}
+
+variants = {(":" ~ variant)*}
+variant = {var_name ~ ("/" ~ vallist)?}
+vallist = {var_arg ~ ("/" ~ var_arg)*}
+
+flag_name = {value}
+flag_arg = {value}
+var_name = {value}
+var_arg = {value}
+value = _{(("\\" | !blacklist) ~ ANY)+}
+
+blacklist = _{ws | "&" | ">" | "=" | ":" | "/"}
+ws = _{" " | "\t" | "\n" | "\r"}
