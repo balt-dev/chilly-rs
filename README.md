@@ -1,2 +1,10 @@
-# chilly-rs
-RIC rewrite, attempt 3. Blocking out code in Python is fine, but I like Rust more.
+# Chilly
+### Let's do this one last time.
+---
+This is my third attempt at rewriting RIC.
+
+I've decided to switch to Rust for this, as I enjoy the language more.
+
+
+
+https://github.dev/balt-dev/chilly
