@@ -1,16 +1,51 @@
 #![warn(missing_docs, clippy::pedantic, clippy::perf)]
 #![doc = include_str!(r"../README.md")]
 
+use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
+use std::ops::{Add, Mul};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 #[allow(missing_docs)]
 /// A four-dimensional position of an object in a scene.
 pub struct Position {
-    pub x: u64,
-    pub y: u64,
-    pub z: u64,
-    pub t: u64
+    pub x: i64,
+    pub y: i64,
+    pub z: i64,
+    pub t: i64
+}
+
+impl Add<i64> for Position {
+    type Output = Self;
+
+    fn add(self, rhs: i64) -> Self::Output {
+        Position {
+            x: self.x + rhs,
+            y: self.y + rhs,
+            z: self.z + rhs,
+            t: self.t + rhs,
+        }
+    }
+}
+
+impl Mul<f64> for Position {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+        Position {
+            x: ((self.x as f64) * rhs) as i64,
+            y: ((self.y as f64) * rhs) as i64,
+            z: ((self.z as f64) * rhs) as i64,
+            t: ((self.t as f64) * rhs) as i64,
+        }
+    }
+}
+
+impl PartialOrd for Position {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Ord for Position {
