@@ -1,8 +1,5 @@
 #![warn(missing_docs, clippy::pedantic, clippy::perf)]
-#![doc = include_str!(r"../README.md")]
-
-
-
+//! The main runtime of the bot.
 
 fn main() {
 

@@ -49,7 +49,7 @@ impl PartialOrd for Position {
 }
 
 impl Ord for Position {
-    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+    fn cmp(&self, other: &Self) -> Ordering {
         self.z.cmp(&other.z)
             .then(self.y.cmp(&other.y))
             .then(self.x.cmp(&other.x))
@@ -61,12 +61,16 @@ impl Ord for Position {
 pub trait Object {}
 
 /// A whole scene.
+#[derive(Debug, Default)]
 pub struct Scene<O: Object> {
-    map: ObjectMap<O>,
-    flags: HashMap<String, String>
+    /// A tilemap of the objects in the scene.
+    pub map: ObjectMap<O>,
+    /// The attached flags of the scene.
+    pub flags: HashMap<String, Option<String>>
 }
 
 /// A sparse grid of objects in a scene.
+#[derive(Debug, Default)]
 pub struct ObjectMap<O: Object> {
     /// The width of the map.
     pub width: u64,
