@@ -16,7 +16,7 @@ mod scene {
     use pest_derive::Parser;
     #[derive(Parser)]
     #[grammar = "parser/scene.pest"]
-    pub struct SceneParser;
+    pub struct Parser;
 
     impl Display for Rule {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -113,12 +113,12 @@ fn handle_error(error: Error<Rule>) -> Error<Rule> {
 ///
 /// # Errors
 /// Errors if the scene fails to parse.
-#[allow(clippy::result_large_err)]
+#[allow(clippy::result_large_err, clippy::missing_panics_doc)]
 pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
     // I'll be perfectly honest here.
     // Using pest here is overkill.
     // But, I like using it, so I'm using it.
-    let maybe_raw_scene = scene::SceneParser::parse(Rule::scene, scene);
+    let maybe_raw_scene = scene::Parser::parse(Rule::scene, scene);
     let Ok(mut raw_scene) = maybe_raw_scene else {
         return Err(handle_error(maybe_raw_scene.unwrap_err()));
     };

@@ -20,4 +20,4 @@ Cargo.lock
 
 # For shuttle
 
-Secrets.toml
+crates/bot/Secrets.dev.toml

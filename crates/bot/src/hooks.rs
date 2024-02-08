@@ -5,8 +5,8 @@ use serenity::all::{Message, StandardFramework, UserId};
 use serenity::framework::standard::macros::hook;
 use serenity::framework::standard::{CommandError, Configuration};
 use serenity::prelude::*;
-use crate::bot::groups;
-use crate::bot::structures::Config;
+use crate::groups;
+use crate::structures::Config;
 
 #[hook]
 async fn after(
