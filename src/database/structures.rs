@@ -16,7 +16,8 @@ use serde::{
 use serde_repr::{Serialize_repr, Deserialize_repr};
 
 #[repr(i8)]
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default, Serialize_repr, Deserialize_repr)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(Serialize_repr, Deserialize_repr))]
 /// An enumeration over possible tiling modes for a tile.
 pub enum Tiling {
     /// No tiling. Only has one sprite.
