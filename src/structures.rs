@@ -1,54 +1,68 @@
-#![warn(missing_docs, clippy::pedantic, clippy::perf)]
-#![doc = include_str!(r"../README.md")]
+//! Holds a few data structures for general use.
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
 use std::ops::{Add, Mul};
+use num_traits::Num;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 #[allow(missing_docs)]
 /// A four-dimensional position of an object in a scene.
-pub struct Position {
-    pub x: i64,
-    pub y: i64,
-    pub z: i64,
-    pub t: i64
+pub struct Position<N: Num> {
+    pub x: N,
+    pub y: N,
+    pub z: N,
+    pub t: N
 }
 
-impl Add<i64> for Position {
-    type Output = Self;
-
-    fn add(self, rhs: i64) -> Self::Output {
+impl<N> Position<N> where N: Num {
+    /// Converts this position into another numeric representation.
+    ///
+    /// # Notes
+    /// This cannot be a basic From implementation, as From can't blanket all types.
+    fn into<O: From<N> + Num>(self) -> Position<O> {
         Position {
-            x: self.x + rhs,
-            y: self.y + rhs,
-            z: self.z + rhs,
-            t: self.t + rhs,
+            x: self.x.into(),
+            y: self.y.into(),
+            z: self.z.into(),
+            t: self.t.into()
         }
     }
 }
 
-impl Mul<f64> for Position {
-    type Output = Self;
+impl<N: Num + Into<A>, A: Num + Copy> Add<A> for Position<N> {
+    type Output = Position<A>;
 
-    fn mul(self, rhs: f64) -> Self::Output {
-        #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+    fn add(self, rhs: A) -> Self::Output {
         Position {
-            x: ((self.x as f64) * rhs) as i64,
-            y: ((self.y as f64) * rhs) as i64,
-            z: ((self.z as f64) * rhs) as i64,
-            t: ((self.t as f64) * rhs) as i64,
+            x: self.x.into() + rhs,
+            y: self.y.into() + rhs,
+            z: self.z.into() + rhs,
+            t: self.t.into() + rhs,
         }
     }
 }
 
-impl PartialOrd for Position {
+impl<N: Num + Into<A>, A: Num + Copy> Mul<A> for Position<N> {
+    type Output = Position<A>;
+
+    fn mul(self, rhs: A) -> Self::Output {
+        Position {
+            x: self.x.into() * rhs,
+            y: self.y.into() * rhs,
+            z: self.z.into() * rhs,
+            t: self.t.into() * rhs,
+        }
+    }
+}
+
+impl<N: Ord + Num> PartialOrd for Position<N> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Position {
+impl<N: Ord + Num> Ord for Position<N> {
     fn cmp(&self, other: &Self) -> Ordering {
         self.z.cmp(&other.z)
             .then(self.y.cmp(&other.y))
@@ -62,22 +76,22 @@ pub trait Object {}
 
 /// A whole scene.
 #[derive(Debug, Default)]
-pub struct Scene<O: Object> {
+pub struct Scene<O: Object, N: Num> {
     /// A tilemap of the objects in the scene.
-    pub map: ObjectMap<O>,
+    pub map: ObjectMap<O, N>,
     /// The attached flags of the scene.
     pub flags: HashMap<String, Option<String>>
 }
 
 /// A sparse grid of objects in a scene.
 #[derive(Debug, Default)]
-pub struct ObjectMap<O: Object> {
+pub struct ObjectMap<O: Object, N: Num> {
     /// The width of the map.
-    pub width: u64,
+    pub width: usize,
     /// The height of the map.
-    pub height: u64,
+    pub height: usize,
     /// The time length of the map.
-    pub length: u64,
+    pub length: usize,
     /// A map of positions to objects.
-    pub objects: BTreeMap<Position, O>
+    pub objects: BTreeMap<Position<N>, O>
 }

@@ -1,3 +1,4 @@
+workspace = { members = ["crates/bot"] }
 [package]
 name = "chilly"
 version = "0.1.0"
@@ -10,3 +11,7 @@ pest = "2"
 pest_derive = "2"
 displaydoc = "0.2"
 itertools = "0.12"
+num-traits = "0.2"
+thiserror = "1"
+anyhow = "1"
+toml = { version = "0.8", features = ["parse"] }

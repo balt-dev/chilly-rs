@@ -1,0 +1,1804 @@
+#![feature(prelude_import)]
+#![warn(missing_docs, clippy::pedantic, clippy::perf)]
+#![doc =
+"# Chilly\n\n### Let\'s do this one last time.\n\n---\nThis is my third attempt at rewriting RIC.\n\nI\'ve decided to switch to Rust for this, as I enjoy the language more.\n\n\n\nhttps://github.dev/balt-dev/chilly\n"]
+#[prelude_import]
+use std::prelude::rust_2021::*;
+#[macro_use]
+extern crate std;
+
+pub mod parser {
+    //! Handles tilemap parsing.
+    use std::collections::{BTreeMap, HashMap};
+    use itertools::Itertools;
+    use num_traits::Num;
+    use pest::error::{ErrorVariant, Error};
+    use pest::iterators::Pair;
+    use pest::Parser;
+    use crate::structures::{Position, Object, Scene, ObjectMap};
+    mod scene {
+        #![allow(missing_docs)]
+        use std::fmt::{Display, Formatter};
+        use pest_derive::Parser;
+        #[grammar = "parser/scene.pest"]
+        pub struct SceneParser;
+        #[allow(non_upper_case_globals)]
+        const _PEST_GRAMMAR_SceneParser: [&'static str; 1usize] =
+            ["scene = _{SOI ~ flags ~ tilemap ~ EOI}\n\nflags = {(flag ~ ws+)* ~ flag?}\nflag = {\"-\" ~ \"-\"? ~ flag_name ~ (\"=\" ~ flag_arg)?}\n\ntilemap = {((row ~ \"\\n\")* ~ row)?}\nrow = {((stack ~ \" \"+)* ~ stack)?}\nstack = {((anim ~ \"&\")* ~ anim)?}\nanim = {((cell ~ \">\")* ~ cell)?}\ncell = {(object ~ variants)?}\n\nobject = _{tile}\n\ntile = {value}\n\nvariants = {(\":\" ~ variant)*}\nvariant = {var_name ~ (\"/\" ~ vallist)?}\nvallist = _{var_arg ~ (\"/\" ~ var_arg)*}\n\nflag_name = {value}\nflag_arg = {value}\nvar_name = {value}\nvar_arg = {value}\nvalue = _{((\"\\\\\" | !blacklist) ~ ANY)*}\n\nblacklist = _{ws | \"&\" | \">\" | \"=\" | \":\" | \"/\"}\nws = _{\" \" | \"\\t\" | \"\\n\" | \"\\r\"}\n"];
+        #[doc = ""]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        pub enum Rule {
+
+            #[doc = "End-of-input"]
+            EOI,
+            scene,
+            flags,
+            flag,
+            tilemap,
+            row,
+            stack,
+            anim,
+            cell,
+            object,
+            tile,
+            variants,
+            variant,
+            vallist,
+            flag_name,
+            flag_arg,
+            var_name,
+            var_arg,
+            value,
+            blacklist,
+            ws,
+        }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::clone::Clone for Rule {
+            #[inline]
+            fn clone(&self) -> Rule { *self }
+        }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::marker::Copy for Rule { }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::fmt::Debug for Rule {
+            #[inline]
+            fn fmt(&self, f: &mut ::core::fmt::Formatter)
+                -> ::core::fmt::Result {
+                ::core::fmt::Formatter::write_str(f,
+                    match self {
+                        Rule::EOI => "EOI",
+                        Rule::scene => "scene",
+                        Rule::flags => "flags",
+                        Rule::flag => "flag",
+                        Rule::tilemap => "tilemap",
+                        Rule::row => "row",
+                        Rule::stack => "stack",
+                        Rule::anim => "anim",
+                        Rule::cell => "cell",
+                        Rule::object => "object",
+                        Rule::tile => "tile",
+                        Rule::variants => "variants",
+                        Rule::variant => "variant",
+                        Rule::vallist => "vallist",
+                        Rule::flag_name => "flag_name",
+                        Rule::flag_arg => "flag_arg",
+                        Rule::var_name => "var_name",
+                        Rule::var_arg => "var_arg",
+                        Rule::value => "value",
+                        Rule::blacklist => "blacklist",
+                        Rule::ws => "ws",
+                    })
+            }
+        }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::marker::StructuralEq for Rule { }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::cmp::Eq for Rule {
+            #[inline]
+            #[doc(hidden)]
+            #[coverage(off)]
+            fn assert_receiver_is_total_eq(&self) -> () {}
+        }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::hash::Hash for Rule {
+            #[inline]
+            fn hash<__H: ::core::hash::Hasher>(&self, state: &mut __H) -> () {
+                let __self_tag = ::core::intrinsics::discriminant_value(self);
+                ::core::hash::Hash::hash(&__self_tag, state)
+            }
+        }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::cmp::Ord for Rule {
+            #[inline]
+            fn cmp(&self, other: &Rule) -> ::core::cmp::Ordering {
+                let __self_tag = ::core::intrinsics::discriminant_value(self);
+                let __arg1_tag =
+                    ::core::intrinsics::discriminant_value(other);
+                ::core::cmp::Ord::cmp(&__self_tag, &__arg1_tag)
+            }
+        }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::marker::StructuralPartialEq for Rule { }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::cmp::PartialEq for Rule {
+            #[inline]
+            fn eq(&self, other: &Rule) -> bool {
+                let __self_tag = ::core::intrinsics::discriminant_value(self);
+                let __arg1_tag =
+                    ::core::intrinsics::discriminant_value(other);
+                __self_tag == __arg1_tag
+            }
+        }
+        #[automatically_derived]
+        #[allow(dead_code, non_camel_case_types, clippy ::
+        upper_case_acronyms)]
+        impl ::core::cmp::PartialOrd for Rule {
+            #[inline]
+            fn partial_cmp(&self, other: &Rule)
+                -> ::core::option::Option<::core::cmp::Ordering> {
+                let __self_tag = ::core::intrinsics::discriminant_value(self);
+                let __arg1_tag =
+                    ::core::intrinsics::discriminant_value(other);
+                ::core::cmp::PartialOrd::partial_cmp(&__self_tag, &__arg1_tag)
+            }
+        }
+        impl Rule {
+            pub fn all_rules() -> &'static [Rule] {
+                &[Rule::scene, Rule::flags, Rule::flag, Rule::tilemap,
+                            Rule::row, Rule::stack, Rule::anim, Rule::cell,
+                            Rule::object, Rule::tile, Rule::variants, Rule::variant,
+                            Rule::vallist, Rule::flag_name, Rule::flag_arg,
+                            Rule::var_name, Rule::var_arg, Rule::value, Rule::blacklist,
+                            Rule::ws]
+            }
+        }
+        #[allow(clippy :: all)]
+        impl ::pest::Parser<Rule> for SceneParser {
+            fn parse<'i>(rule: Rule, input: &'i str)
+                ->
+                    ::std::result::Result<::pest::iterators::Pairs<'i, Rule>,
+                    ::pest::error::Error<Rule>> {
+                mod rules {
+                    #![allow(clippy :: upper_case_acronyms)]
+                    pub mod hidden {
+                        use super::super::Rule;
+                        #[inline]
+                        #[allow(dead_code, non_snake_case, unused_variables)]
+                        pub fn skip(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            Ok(state)
+                        }
+                    }
+                    pub mod visible {
+                        use super::super::Rule;
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn scene(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.sequence(|state|
+                                    {
+                                        self::SOI(state).and_then(|state|
+                                                                    {
+                                                                        super::hidden::skip(state)
+                                                                    }).and_then(|state|
+                                                                {
+                                                                    self::flags(state)
+                                                                }).and_then(|state|
+                                                            {
+                                                                super::hidden::skip(state)
+                                                            }).and_then(|state|
+                                                        {
+                                                            self::tilemap(state)
+                                                        }).and_then(|state|
+                                                    {
+                                                        super::hidden::skip(state)
+                                                    }).and_then(|state| { self::EOI(state) })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn flags(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::flags,
+                                |state|
+                                    {
+                                        state.sequence(|state|
+                                                {
+                                                    state.sequence(|state|
+                                                                    {
+                                                                        state.optional(|state|
+                                                                                {
+                                                                                    state.sequence(|state|
+                                                                                                {
+                                                                                                    self::flag(state).and_then(|state|
+                                                                                                                        {
+                                                                                                                            super::hidden::skip(state)
+                                                                                                                        }).and_then(|state|
+                                                                                                                    {
+                                                                                                                        self::ws(state)
+                                                                                                                    }).and_then(|state|
+                                                                                                                {
+                                                                                                                    super::hidden::skip(state)
+                                                                                                                }).and_then(|state|
+                                                                                                            {
+                                                                                                                state.sequence(|state|
+                                                                                                                        {
+                                                                                                                            state.optional(|state|
+                                                                                                                                    {
+                                                                                                                                        self::ws(state).and_then(|state|
+                                                                                                                                                {
+                                                                                                                                                    state.repeat(|state|
+                                                                                                                                                            {
+                                                                                                                                                                state.sequence(|state|
+                                                                                                                                                                        {
+                                                                                                                                                                            super::hidden::skip(state).and_then(|state|
+                                                                                                                                                                                    { self::ws(state) })
+                                                                                                                                                                        })
+                                                                                                                                                            })
+                                                                                                                                                })
+                                                                                                                                    })
+                                                                                                                        })
+                                                                                                            })
+                                                                                                }).and_then(|state|
+                                                                                            {
+                                                                                                state.repeat(|state|
+                                                                                                        {
+                                                                                                            state.sequence(|state|
+                                                                                                                    {
+                                                                                                                        super::hidden::skip(state).and_then(|state|
+                                                                                                                                {
+                                                                                                                                    state.sequence(|state|
+                                                                                                                                            {
+                                                                                                                                                self::flag(state).and_then(|state|
+                                                                                                                                                                    {
+                                                                                                                                                                        super::hidden::skip(state)
+                                                                                                                                                                    }).and_then(|state|
+                                                                                                                                                                {
+                                                                                                                                                                    self::ws(state)
+                                                                                                                                                                }).and_then(|state|
+                                                                                                                                                            {
+                                                                                                                                                                super::hidden::skip(state)
+                                                                                                                                                            }).and_then(|state|
+                                                                                                                                                        {
+                                                                                                                                                            state.sequence(|state|
+                                                                                                                                                                    {
+                                                                                                                                                                        state.optional(|state|
+                                                                                                                                                                                {
+                                                                                                                                                                                    self::ws(state).and_then(|state|
+                                                                                                                                                                                            {
+                                                                                                                                                                                                state.repeat(|state|
+                                                                                                                                                                                                        {
+                                                                                                                                                                                                            state.sequence(|state|
+                                                                                                                                                                                                                    {
+                                                                                                                                                                                                                        super::hidden::skip(state).and_then(|state|
+                                                                                                                                                                                                                                { self::ws(state) })
+                                                                                                                                                                                                                    })
+                                                                                                                                                                                                        })
+                                                                                                                                                                                            })
+                                                                                                                                                                                })
+                                                                                                                                                                    })
+                                                                                                                                                        })
+                                                                                                                                            })
+                                                                                                                                })
+                                                                                                                    })
+                                                                                                        })
+                                                                                            })
+                                                                                })
+                                                                    }).and_then(|state|
+                                                                {
+                                                                    super::hidden::skip(state)
+                                                                }).and_then(|state|
+                                                            { state.optional(|state| { self::flag(state) }) })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn flag(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::flag,
+                                |state|
+                                    {
+                                        state.sequence(|state|
+                                                {
+                                                    state.match_string("-").and_then(|state|
+                                                                                {
+                                                                                    super::hidden::skip(state)
+                                                                                }).and_then(|state|
+                                                                            {
+                                                                                state.optional(|state| { state.match_string("-") })
+                                                                            }).and_then(|state|
+                                                                        {
+                                                                            super::hidden::skip(state)
+                                                                        }).and_then(|state|
+                                                                    {
+                                                                        self::flag_name(state)
+                                                                    }).and_then(|state|
+                                                                {
+                                                                    super::hidden::skip(state)
+                                                                }).and_then(|state|
+                                                            {
+                                                                state.optional(|state|
+                                                                        {
+                                                                            state.sequence(|state|
+                                                                                    {
+                                                                                        state.match_string("=").and_then(|state|
+                                                                                                    {
+                                                                                                        super::hidden::skip(state)
+                                                                                                    }).and_then(|state| { self::flag_arg(state) })
+                                                                                    })
+                                                                        })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn tilemap(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::tilemap,
+                                |state|
+                                    {
+                                        state.optional(|state|
+                                                {
+                                                    state.sequence(|state|
+                                                            {
+                                                                self::row(state).and_then(|state|
+                                                                            {
+                                                                                super::hidden::skip(state)
+                                                                            }).and_then(|state|
+                                                                        {
+                                                                            state.sequence(|state|
+                                                                                    {
+                                                                                        state.optional(|state|
+                                                                                                {
+                                                                                                    state.sequence(|state|
+                                                                                                                {
+                                                                                                                    state.match_string("\n").and_then(|state|
+                                                                                                                                {
+                                                                                                                                    super::hidden::skip(state)
+                                                                                                                                }).and_then(|state| { self::row(state) })
+                                                                                                                }).and_then(|state|
+                                                                                                            {
+                                                                                                                state.repeat(|state|
+                                                                                                                        {
+                                                                                                                            state.sequence(|state|
+                                                                                                                                    {
+                                                                                                                                        super::hidden::skip(state).and_then(|state|
+                                                                                                                                                {
+                                                                                                                                                    state.sequence(|state|
+                                                                                                                                                            {
+                                                                                                                                                                state.match_string("\n").and_then(|state|
+                                                                                                                                                                            {
+                                                                                                                                                                                super::hidden::skip(state)
+                                                                                                                                                                            }).and_then(|state| { self::row(state) })
+                                                                                                                                                            })
+                                                                                                                                                })
+                                                                                                                                    })
+                                                                                                                        })
+                                                                                                            })
+                                                                                                })
+                                                                                    })
+                                                                        })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn row(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::row,
+                                |state|
+                                    {
+                                        state.optional(|state|
+                                                {
+                                                    state.sequence(|state|
+                                                            {
+                                                                self::stack(state).and_then(|state|
+                                                                            {
+                                                                                super::hidden::skip(state)
+                                                                            }).and_then(|state|
+                                                                        {
+                                                                            state.sequence(|state|
+                                                                                    {
+                                                                                        state.optional(|state|
+                                                                                                {
+                                                                                                    state.sequence(|state|
+                                                                                                                {
+                                                                                                                    state.sequence(|state|
+                                                                                                                                    {
+                                                                                                                                        state.match_string(" ").and_then(|state|
+                                                                                                                                                    {
+                                                                                                                                                        super::hidden::skip(state)
+                                                                                                                                                    }).and_then(|state|
+                                                                                                                                                {
+                                                                                                                                                    state.sequence(|state|
+                                                                                                                                                            {
+                                                                                                                                                                state.optional(|state|
+                                                                                                                                                                        {
+                                                                                                                                                                            state.match_string(" ").and_then(|state|
+                                                                                                                                                                                    {
+                                                                                                                                                                                        state.repeat(|state|
+                                                                                                                                                                                                {
+                                                                                                                                                                                                    state.sequence(|state|
+                                                                                                                                                                                                            {
+                                                                                                                                                                                                                super::hidden::skip(state).and_then(|state|
+                                                                                                                                                                                                                        { state.match_string(" ") })
+                                                                                                                                                                                                            })
+                                                                                                                                                                                                })
+                                                                                                                                                                                    })
+                                                                                                                                                                        })
+                                                                                                                                                            })
+                                                                                                                                                })
+                                                                                                                                    }).and_then(|state|
+                                                                                                                                {
+                                                                                                                                    super::hidden::skip(state)
+                                                                                                                                }).and_then(|state| { self::stack(state) })
+                                                                                                                }).and_then(|state|
+                                                                                                            {
+                                                                                                                state.repeat(|state|
+                                                                                                                        {
+                                                                                                                            state.sequence(|state|
+                                                                                                                                    {
+                                                                                                                                        super::hidden::skip(state).and_then(|state|
+                                                                                                                                                {
+                                                                                                                                                    state.sequence(|state|
+                                                                                                                                                            {
+                                                                                                                                                                state.sequence(|state|
+                                                                                                                                                                                {
+                                                                                                                                                                                    state.match_string(" ").and_then(|state|
+                                                                                                                                                                                                {
+                                                                                                                                                                                                    super::hidden::skip(state)
+                                                                                                                                                                                                }).and_then(|state|
+                                                                                                                                                                                            {
+                                                                                                                                                                                                state.sequence(|state|
+                                                                                                                                                                                                        {
+                                                                                                                                                                                                            state.optional(|state|
+                                                                                                                                                                                                                    {
+                                                                                                                                                                                                                        state.match_string(" ").and_then(|state|
+                                                                                                                                                                                                                                {
+                                                                                                                                                                                                                                    state.repeat(|state|
+                                                                                                                                                                                                                                            {
+                                                                                                                                                                                                                                                state.sequence(|state|
+                                                                                                                                                                                                                                                        {
+                                                                                                                                                                                                                                                            super::hidden::skip(state).and_then(|state|
+                                                                                                                                                                                                                                                                    { state.match_string(" ") })
+                                                                                                                                                                                                                                                        })
+                                                                                                                                                                                                                                            })
+                                                                                                                                                                                                                                })
+                                                                                                                                                                                                                    })
+                                                                                                                                                                                                        })
+                                                                                                                                                                                            })
+                                                                                                                                                                                }).and_then(|state|
+                                                                                                                                                                            {
+                                                                                                                                                                                super::hidden::skip(state)
+                                                                                                                                                                            }).and_then(|state| { self::stack(state) })
+                                                                                                                                                            })
+                                                                                                                                                })
+                                                                                                                                    })
+                                                                                                                        })
+                                                                                                            })
+                                                                                                })
+                                                                                    })
+                                                                        })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn stack(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::stack,
+                                |state|
+                                    {
+                                        state.optional(|state|
+                                                {
+                                                    state.sequence(|state|
+                                                            {
+                                                                self::anim(state).and_then(|state|
+                                                                            {
+                                                                                super::hidden::skip(state)
+                                                                            }).and_then(|state|
+                                                                        {
+                                                                            state.sequence(|state|
+                                                                                    {
+                                                                                        state.optional(|state|
+                                                                                                {
+                                                                                                    state.sequence(|state|
+                                                                                                                {
+                                                                                                                    state.match_string("&").and_then(|state|
+                                                                                                                                {
+                                                                                                                                    super::hidden::skip(state)
+                                                                                                                                }).and_then(|state| { self::anim(state) })
+                                                                                                                }).and_then(|state|
+                                                                                                            {
+                                                                                                                state.repeat(|state|
+                                                                                                                        {
+                                                                                                                            state.sequence(|state|
+                                                                                                                                    {
+                                                                                                                                        super::hidden::skip(state).and_then(|state|
+                                                                                                                                                {
+                                                                                                                                                    state.sequence(|state|
+                                                                                                                                                            {
+                                                                                                                                                                state.match_string("&").and_then(|state|
+                                                                                                                                                                            {
+                                                                                                                                                                                super::hidden::skip(state)
+                                                                                                                                                                            }).and_then(|state| { self::anim(state) })
+                                                                                                                                                            })
+                                                                                                                                                })
+                                                                                                                                    })
+                                                                                                                        })
+                                                                                                            })
+                                                                                                })
+                                                                                    })
+                                                                        })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn anim(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::anim,
+                                |state|
+                                    {
+                                        state.optional(|state|
+                                                {
+                                                    state.sequence(|state|
+                                                            {
+                                                                self::cell(state).and_then(|state|
+                                                                            {
+                                                                                super::hidden::skip(state)
+                                                                            }).and_then(|state|
+                                                                        {
+                                                                            state.sequence(|state|
+                                                                                    {
+                                                                                        state.optional(|state|
+                                                                                                {
+                                                                                                    state.sequence(|state|
+                                                                                                                {
+                                                                                                                    state.match_string(">").and_then(|state|
+                                                                                                                                {
+                                                                                                                                    super::hidden::skip(state)
+                                                                                                                                }).and_then(|state| { self::cell(state) })
+                                                                                                                }).and_then(|state|
+                                                                                                            {
+                                                                                                                state.repeat(|state|
+                                                                                                                        {
+                                                                                                                            state.sequence(|state|
+                                                                                                                                    {
+                                                                                                                                        super::hidden::skip(state).and_then(|state|
+                                                                                                                                                {
+                                                                                                                                                    state.sequence(|state|
+                                                                                                                                                            {
+                                                                                                                                                                state.match_string(">").and_then(|state|
+                                                                                                                                                                            {
+                                                                                                                                                                                super::hidden::skip(state)
+                                                                                                                                                                            }).and_then(|state| { self::cell(state) })
+                                                                                                                                                            })
+                                                                                                                                                })
+                                                                                                                                    })
+                                                                                                                        })
+                                                                                                            })
+                                                                                                })
+                                                                                    })
+                                                                        })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn cell(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::cell,
+                                |state|
+                                    {
+                                        state.optional(|state|
+                                                {
+                                                    state.sequence(|state|
+                                                            {
+                                                                self::object(state).and_then(|state|
+                                                                            {
+                                                                                super::hidden::skip(state)
+                                                                            }).and_then(|state| { self::variants(state) })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn object(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            self::tile(state)
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn tile(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::tile, |state| { self::value(state) })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn variants(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::variants,
+                                |state|
+                                    {
+                                        state.sequence(|state|
+                                                {
+                                                    state.optional(|state|
+                                                            {
+                                                                state.sequence(|state|
+                                                                            {
+                                                                                state.match_string(":").and_then(|state|
+                                                                                            {
+                                                                                                super::hidden::skip(state)
+                                                                                            }).and_then(|state| { self::variant(state) })
+                                                                            }).and_then(|state|
+                                                                        {
+                                                                            state.repeat(|state|
+                                                                                    {
+                                                                                        state.sequence(|state|
+                                                                                                {
+                                                                                                    super::hidden::skip(state).and_then(|state|
+                                                                                                            {
+                                                                                                                state.sequence(|state|
+                                                                                                                        {
+                                                                                                                            state.match_string(":").and_then(|state|
+                                                                                                                                        {
+                                                                                                                                            super::hidden::skip(state)
+                                                                                                                                        }).and_then(|state| { self::variant(state) })
+                                                                                                                        })
+                                                                                                            })
+                                                                                                })
+                                                                                    })
+                                                                        })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn variant(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::variant,
+                                |state|
+                                    {
+                                        state.sequence(|state|
+                                                {
+                                                    self::var_name(state).and_then(|state|
+                                                                {
+                                                                    super::hidden::skip(state)
+                                                                }).and_then(|state|
+                                                            {
+                                                                state.optional(|state|
+                                                                        {
+                                                                            state.sequence(|state|
+                                                                                    {
+                                                                                        state.match_string("/").and_then(|state|
+                                                                                                    {
+                                                                                                        super::hidden::skip(state)
+                                                                                                    }).and_then(|state| { self::vallist(state) })
+                                                                                    })
+                                                                        })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn vallist(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.sequence(|state|
+                                    {
+                                        self::var_arg(state).and_then(|state|
+                                                    {
+                                                        super::hidden::skip(state)
+                                                    }).and_then(|state|
+                                                {
+                                                    state.sequence(|state|
+                                                            {
+                                                                state.optional(|state|
+                                                                        {
+                                                                            state.sequence(|state|
+                                                                                        {
+                                                                                            state.match_string("/").and_then(|state|
+                                                                                                        {
+                                                                                                            super::hidden::skip(state)
+                                                                                                        }).and_then(|state| { self::var_arg(state) })
+                                                                                        }).and_then(|state|
+                                                                                    {
+                                                                                        state.repeat(|state|
+                                                                                                {
+                                                                                                    state.sequence(|state|
+                                                                                                            {
+                                                                                                                super::hidden::skip(state).and_then(|state|
+                                                                                                                        {
+                                                                                                                            state.sequence(|state|
+                                                                                                                                    {
+                                                                                                                                        state.match_string("/").and_then(|state|
+                                                                                                                                                    {
+                                                                                                                                                        super::hidden::skip(state)
+                                                                                                                                                    }).and_then(|state| { self::var_arg(state) })
+                                                                                                                                    })
+                                                                                                                        })
+                                                                                                            })
+                                                                                                })
+                                                                                    })
+                                                                        })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn flag_name(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::flag_name, |state| { self::value(state) })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn flag_arg(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::flag_arg, |state| { self::value(state) })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn var_name(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::var_name, |state| { self::value(state) })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn var_arg(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::var_arg, |state| { self::value(state) })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn value(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.sequence(|state|
+                                    {
+                                        state.optional(|state|
+                                                {
+                                                    state.sequence(|state|
+                                                                {
+                                                                    state.match_string("\\").or_else(|state|
+                                                                                    {
+                                                                                        state.lookahead(false, |state| { self::blacklist(state) })
+                                                                                    }).and_then(|state|
+                                                                                {
+                                                                                    super::hidden::skip(state)
+                                                                                }).and_then(|state| { self::ANY(state) })
+                                                                }).and_then(|state|
+                                                            {
+                                                                state.repeat(|state|
+                                                                        {
+                                                                            state.sequence(|state|
+                                                                                    {
+                                                                                        super::hidden::skip(state).and_then(|state|
+                                                                                                {
+                                                                                                    state.sequence(|state|
+                                                                                                            {
+                                                                                                                state.match_string("\\").or_else(|state|
+                                                                                                                                {
+                                                                                                                                    state.lookahead(false, |state| { self::blacklist(state) })
+                                                                                                                                }).and_then(|state|
+                                                                                                                            {
+                                                                                                                                super::hidden::skip(state)
+                                                                                                                            }).and_then(|state| { self::ANY(state) })
+                                                                                                            })
+                                                                                                })
+                                                                                    })
+                                                                        })
+                                                            })
+                                                })
+                                    })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn blacklist(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            self::ws(state).or_else(|state|
+                                                    {
+                                                        state.match_string("&")
+                                                    }).or_else(|state|
+                                                {
+                                                    state.match_string(">")
+                                                }).or_else(|state|
+                                            {
+                                                state.match_string("=")
+                                            }).or_else(|state|
+                                        {
+                                            state.match_string(":")
+                                        }).or_else(|state| { state.match_string("/") })
+                        }
+                        #[inline]
+                        #[allow(non_snake_case, unused_variables)]
+                        pub fn ws(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.match_string(" ").or_else(|state|
+                                            {
+                                                state.match_string("\t")
+                                            }).or_else(|state|
+                                        {
+                                            state.match_string("\n")
+                                        }).or_else(|state| { state.match_string("\r") })
+                        }
+                        #[inline]
+                        #[allow(dead_code, non_snake_case, unused_variables)]
+                        pub fn ANY(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.skip(1)
+                        }
+                        #[inline]
+                        #[allow(dead_code, non_snake_case, unused_variables)]
+                        pub fn EOI(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.rule(Rule::EOI, |state| state.end_of_input())
+                        }
+                        #[inline]
+                        #[allow(dead_code, non_snake_case, unused_variables)]
+                        pub fn SOI(state:
+                                ::std::boxed::Box<::pest::ParserState<'_, Rule>>)
+                            ->
+                                ::pest::ParseResult<::std::boxed::Box<::pest::ParserState<'_,
+                                Rule>>> {
+                            state.start_of_input()
+                        }
+                    }
+                    pub use self::visible::*;
+                }
+                ::pest::state(input,
+                    |state|
+                        {
+                            match rule {
+                                Rule::scene => rules::scene(state),
+                                Rule::flags => rules::flags(state),
+                                Rule::flag => rules::flag(state),
+                                Rule::tilemap => rules::tilemap(state),
+                                Rule::row => rules::row(state),
+                                Rule::stack => rules::stack(state),
+                                Rule::anim => rules::anim(state),
+                                Rule::cell => rules::cell(state),
+                                Rule::object => rules::object(state),
+                                Rule::tile => rules::tile(state),
+                                Rule::variants => rules::variants(state),
+                                Rule::variant => rules::variant(state),
+                                Rule::vallist => rules::vallist(state),
+                                Rule::flag_name => rules::flag_name(state),
+                                Rule::flag_arg => rules::flag_arg(state),
+                                Rule::var_name => rules::var_name(state),
+                                Rule::var_arg => rules::var_arg(state),
+                                Rule::value => rules::value(state),
+                                Rule::blacklist => rules::blacklist(state),
+                                Rule::ws => rules::ws(state),
+                                Rule::EOI => rules::EOI(state),
+                            }
+                        })
+            }
+        }
+        impl Display for Rule {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                f.write_fmt(format_args!("{0}",
+                        match self {
+                            Rule::scene => "a scene",
+                            Rule::flags => "a list of flags",
+                            Rule::flag => "a flag",
+                            Rule::tilemap => "a tilemap",
+                            Rule::row => "a row",
+                            Rule::stack => "a stack",
+                            Rule::anim => "an animation cell",
+                            Rule::cell | Rule::object => "an object",
+                            Rule::tile => "a tile",
+                            Rule::variants => "a list of variants",
+                            Rule::variant => "a variant",
+                            Rule::vallist => "a list of variant arguments",
+                            Rule::flag_name => "a name for a flag",
+                            Rule::flag_arg => "an argument for a flag",
+                            Rule::var_name => "a name for a variant",
+                            Rule::var_arg => "a list of arguments for a variant",
+                            Rule::value | Rule::blacklist | Rule::ws =>
+                                "<internal token>",
+                            Rule::EOI => "the end of the input",
+                        }))
+            }
+        }
+    }
+    use scene::Rule;
+    /// An unparsed tile.
+    pub struct RawTile {
+        /// The tile's name.
+        pub name: String,
+        /// The tile's variants.
+        pub variants: Vec<RawVariant>,
+    }
+    #[automatically_derived]
+    impl ::core::fmt::Debug for RawTile {
+        #[inline]
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            ::core::fmt::Formatter::debug_struct_field2_finish(f, "RawTile",
+                "name", &self.name, "variants", &&self.variants)
+        }
+    }
+    #[automatically_derived]
+    impl ::core::clone::Clone for RawTile {
+        #[inline]
+        fn clone(&self) -> RawTile {
+            RawTile {
+                name: ::core::clone::Clone::clone(&self.name),
+                variants: ::core::clone::Clone::clone(&self.variants),
+            }
+        }
+    }
+    #[automatically_derived]
+    impl ::core::marker::StructuralPartialEq for RawTile { }
+    #[automatically_derived]
+    impl ::core::cmp::PartialEq for RawTile {
+        #[inline]
+        fn eq(&self, other: &RawTile) -> bool {
+            self.name == other.name && self.variants == other.variants
+        }
+    }
+    #[automatically_derived]
+    impl ::core::marker::StructuralEq for RawTile { }
+    #[automatically_derived]
+    impl ::core::cmp::Eq for RawTile {
+        #[inline]
+        #[doc(hidden)]
+        #[coverage(off)]
+        fn assert_receiver_is_total_eq(&self) -> () {
+            let _: ::core::cmp::AssertParamIsEq<String>;
+            let _: ::core::cmp::AssertParamIsEq<Vec<RawVariant>>;
+        }
+    }
+    impl Object for RawTile {}
+    /// An unparsed variant.
+    pub struct RawVariant {
+        /// The variant's name.
+        pub name: String,
+        /// The variant's arguments.
+        pub arguments: Vec<String>,
+    }
+    #[automatically_derived]
+    impl ::core::fmt::Debug for RawVariant {
+        #[inline]
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            ::core::fmt::Formatter::debug_struct_field2_finish(f,
+                "RawVariant", "name", &self.name, "arguments",
+                &&self.arguments)
+        }
+    }
+    #[automatically_derived]
+    impl ::core::clone::Clone for RawVariant {
+        #[inline]
+        fn clone(&self) -> RawVariant {
+            RawVariant {
+                name: ::core::clone::Clone::clone(&self.name),
+                arguments: ::core::clone::Clone::clone(&self.arguments),
+            }
+        }
+    }
+    #[automatically_derived]
+    impl ::core::marker::StructuralPartialEq for RawVariant { }
+    #[automatically_derived]
+    impl ::core::cmp::PartialEq for RawVariant {
+        #[inline]
+        fn eq(&self, other: &RawVariant) -> bool {
+            self.name == other.name && self.arguments == other.arguments
+        }
+    }
+    #[automatically_derived]
+    impl ::core::marker::StructuralEq for RawVariant { }
+    #[automatically_derived]
+    impl ::core::cmp::Eq for RawVariant {
+        #[inline]
+        #[doc(hidden)]
+        #[coverage(off)]
+        fn assert_receiver_is_total_eq(&self) -> () {
+            let _: ::core::cmp::AssertParamIsEq<String>;
+            let _: ::core::cmp::AssertParamIsEq<Vec<String>>;
+        }
+    }
+    /// Formats a pest error for better readability.
+    fn handle_error(error: Error<Rule>) -> Error<Rule> {
+        let ErrorVariant::ParsingError { positives, negatives } =
+            &error.variant else { return error; };
+        let mut needed =
+            positives.iter().map(|rule|
+                        {
+                            let res = ::alloc::fmt::format(format_args!("{0}", rule));
+                            res
+                        }).collect::<Vec<String>>();
+        let unexpected =
+            negatives.iter().map(|rule|
+                        {
+                            let res = ::alloc::fmt::format(format_args!("{0}", rule));
+                            res
+                        }).collect::<Vec<String>>();
+        let needed_message =
+            match needed.len() {
+                0 => String::new(),
+                c => {
+                    let res =
+                        ::alloc::fmt::format(format_args!("expected {0} here\n",
+                                match c {
+                                    1 => needed[0].clone(),
+                                    2 => {
+                                        let res =
+                                            ::alloc::fmt::format(format_args!("{0} or {1}",
+                                                    needed.first().unwrap(), needed.get(1).unwrap()));
+                                        res
+                                    }
+                                    _ => {
+                                        let last = needed.pop().unwrap();
+                                        {
+                                            let res =
+                                                ::alloc::fmt::format(format_args!("{0}, or {1}",
+                                                        needed.join(", "), last));
+                                            res
+                                        }
+                                    }
+                                }));
+                    res
+                }
+            };
+        let unexpected_message =
+            match unexpected.len() {
+                0 => String::new(),
+                c => {
+                    let res =
+                        ::alloc::fmt::format(format_args!("did not expect {0} here",
+                                match c {
+                                    1 => needed[0].clone(),
+                                    2 => {
+                                        let res =
+                                            ::alloc::fmt::format(format_args!("{0} or {1}",
+                                                    needed.first().unwrap(), needed.get(1).unwrap()));
+                                        res
+                                    }
+                                    _ => {
+                                        let last = needed.pop().unwrap();
+                                        {
+                                            let res =
+                                                ::alloc::fmt::format(format_args!("{0}, or {1}",
+                                                        needed.join(", "), last));
+                                            res
+                                        }
+                                    }
+                                }));
+                    res
+                }
+            };
+        let mut formatted_error = error.clone();
+        formatted_error.variant =
+            ErrorVariant::CustomError {
+                message: {
+                    let res =
+                        ::alloc::fmt::format(format_args!("{0}{1}", needed_message,
+                                unexpected_message));
+                    res
+                },
+            };
+        formatted_error
+    }
+    /// Parses a scene.
+    ///
+    /// # Errors
+    /// Errors if the scene fails to parse.
+    #[allow(clippy::result_large_err)]
+    pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
+        let maybe_raw_scene = scene::SceneParser::parse(Rule::scene, scene);
+        let Ok(mut raw_scene) =
+            maybe_raw_scene else {
+                return Err(handle_error(maybe_raw_scene.unwrap_err()));
+            };
+        let flags =
+            raw_scene.next().unwrap().into_inner().filter_map(|flag|
+                        {
+                            let mut parts = flag.into_inner();
+                            if parts.len() == 0 { return None; }
+                            let name = parts.next().unwrap().as_str().to_string();
+                            let value =
+                                parts.next().map(|pair| pair.as_str()).map(str::to_string);
+                            Some((name, value))
+                        }).collect::<HashMap<_, _>>();
+        let tilemap_iter =
+            raw_scene.next().unwrap().into_inner().enumerate().flat_map(|(y,
+                        row)|
+                    row.into_inner().enumerate().flat_map(move |(x, stack)|
+                            stack.into_inner().enumerate().map(move |(z, animation)|
+                                    animation.into_inner().enumerate().map(move |(t, cell)|
+                                            (Position { x, y, z, t }, cell)))));
+        let Position { x: width, y: height, t: length, .. } =
+            tilemap_iter.clone().flatten().fold(Position::<usize>::default(),
+                |last, (this, _)|
+                    Position {
+                        x: last.x.max(this.x + 1),
+                        y: last.y.max(this.y + 1),
+                        z: last.z.max(this.z + 1),
+                        t: last.t.max(this.t + 1),
+                    });
+        let tiles =
+            tilemap_iter.flat_map(|iter|
+                            {
+                                let iter_len = iter.len();
+                                (match iter_len {
+                                        tmp => {
+                                            {
+                                                ::std::io::_eprint(format_args!("[{0}:{1}:{2}] {3} = {4:#?}\n",
+                                                        "src/parser/mod.rs", 162u32, 9u32, "iter_len", &tmp));
+                                            };
+                                            tmp
+                                        }
+                                    },
+                                    match length {
+                                        tmp => {
+                                            {
+                                                ::std::io::_eprint(format_args!("[{0}:{1}:{2}] {3} = {4:#?}\n",
+                                                        "src/parser/mod.rs", 162u32, 9u32, "length", &tmp));
+                                            };
+                                            tmp
+                                        }
+                                    });
+                                let nonstop_iter =
+                                    iter.map(Some).pad_using(length, |_| None);
+                                nonstop_iter.scan(None,
+                                    |last_tile: &mut Option<(Position<usize>, RawTile)>,
+                                        maybe_tile|
+                                        {
+                                            if maybe_tile.is_none() {
+                                                    let mut last = last_tile.clone();
+                                                    { ::std::io::_eprint(format_args!("{0:?}\n", last)); };
+                                                    if let Some((ref mut pos, _)) = last { pos.t += 1; }
+                                                    *last_tile = last.clone();
+                                                    return Some(last)
+                                                }
+                                            let (pos, current_obj) = maybe_tile.unwrap();
+                                            let mut pairs = current_obj.into_inner();
+                                            let object = pairs.next().unwrap();
+                                            let variants = pairs.next().unwrap();
+                                            if object.as_rule() != Rule::tile {
+                                                    {
+                                                        ::core::panicking::panic_fmt(format_args!("not yet implemented: {0}",
+                                                                format_args!("Object type not implemented: {0}",
+                                                                    object.as_rule())));
+                                                    }
+                                                }
+                                            let name = object.as_str();
+                                            let Some(tile) =
+                                                parse_tile(last_tile, name,
+                                                    variants) else { return Some(None); };
+                                            *last_tile = Some((pos, tile.clone()));
+                                            Some(Some((pos, tile)))
+                                        })
+                            }).flatten().collect::<BTreeMap<_, _>>();
+        Ok(Scene {
+                map: ObjectMap { width, height, length, objects: tiles },
+                flags,
+            })
+    }
+    fn parse_tile<N: Num>(last_tile: &mut Option<(Position<N>, RawTile)>,
+        name: &str, variants: Pair<Rule>) -> Option<RawTile> {
+        let mut new_tile = false;
+        let name =
+            match name {
+                "" if last_tile.is_some() =>
+                    last_tile.as_ref().unwrap().1.name.to_string(),
+                "." | "" => { *last_tile = None; return None; }
+                name => { new_tile = true; name.to_string() }
+            };
+        let mut variants =
+            variants.into_inner().map(|variant|
+                        {
+                            let mut variant = variant.into_inner();
+                            let name = variant.next().unwrap().as_str().to_string();
+                            let arguments =
+                                variant.map(|pair|
+                                            pair.as_str().to_string()).collect::<Vec<_>>();
+                            RawVariant { name, arguments }
+                        }).collect::<Vec<_>>();
+        if !new_tile && variants.is_empty() && last_tile.is_some() {
+                variants = last_tile.as_ref().unwrap().1.variants.clone();
+            }
+        Some(RawTile { name, variants })
+    }
+}
+pub mod structures {
+    //! Holds a few data structures for general use.
+    use std::cmp::Ordering;
+    use std::collections::{BTreeMap, HashMap};
+    use std::ops::{Add, Mul};
+    use num_traits::Num;
+    #[allow(missing_docs)]
+    /// A four-dimensional position of an object in a scene.
+    pub struct Position<N: Num> {
+        pub x: N,
+        pub y: N,
+        pub z: N,
+        pub t: N,
+    }
+    #[automatically_derived]
+    #[allow(missing_docs)]
+    impl<N: ::core::marker::Copy + Num> ::core::marker::Copy for Position<N> {
+    }
+    #[automatically_derived]
+    #[allow(missing_docs)]
+    impl<N: ::core::clone::Clone + Num> ::core::clone::Clone for Position<N> {
+        #[inline]
+        fn clone(&self) -> Position<N> {
+            Position {
+                x: ::core::clone::Clone::clone(&self.x),
+                y: ::core::clone::Clone::clone(&self.y),
+                z: ::core::clone::Clone::clone(&self.z),
+                t: ::core::clone::Clone::clone(&self.t),
+            }
+        }
+    }
+    #[automatically_derived]
+    #[allow(missing_docs)]
+    impl<N: ::core::fmt::Debug + Num> ::core::fmt::Debug for Position<N> {
+        #[inline]
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            ::core::fmt::Formatter::debug_struct_field4_finish(f, "Position",
+                "x", &self.x, "y", &self.y, "z", &self.z, "t", &&self.t)
+        }
+    }
+    #[automatically_derived]
+    #[allow(missing_docs)]
+    impl<N: Num> ::core::marker::StructuralPartialEq for Position<N> { }
+    #[automatically_derived]
+    #[allow(missing_docs)]
+    impl<N: ::core::cmp::PartialEq + Num> ::core::cmp::PartialEq for
+        Position<N> {
+        #[inline]
+        fn eq(&self, other: &Position<N>) -> bool {
+            self.x == other.x && self.y == other.y && self.z == other.z &&
+                self.t == other.t
+        }
+    }
+    #[automatically_derived]
+    #[allow(missing_docs)]
+    impl<N: Num> ::core::marker::StructuralEq for Position<N> { }
+    #[automatically_derived]
+    #[allow(missing_docs)]
+    impl<N: ::core::cmp::Eq + Num> ::core::cmp::Eq for Position<N> {
+        #[inline]
+        #[doc(hidden)]
+        #[coverage(off)]
+        fn assert_receiver_is_total_eq(&self) -> () {
+            let _: ::core::cmp::AssertParamIsEq<N>;
+        }
+    }
+    #[automatically_derived]
+    #[allow(missing_docs)]
+    impl<N: ::core::default::Default + Num> ::core::default::Default for
+        Position<N> {
+        #[inline]
+        fn default() -> Position<N> {
+            Position {
+                x: ::core::default::Default::default(),
+                y: ::core::default::Default::default(),
+                z: ::core::default::Default::default(),
+                t: ::core::default::Default::default(),
+            }
+        }
+    }
+    impl<N> Position<N> where N: Num {
+        /// Converts this position into another numeric representation.
+        ///
+        /// # Notes
+        /// This cannot be a basic From implementation, as From can't blanket all types.
+        fn into<O: From<N> + Num>(self) -> Position<O> {
+            Position {
+                x: self.x.into(),
+                y: self.y.into(),
+                z: self.z.into(),
+                t: self.t.into(),
+            }
+        }
+    }
+    impl<N: Num + Into<A>, A: Num + Copy> Add<A> for Position<N> {
+        type Output = Position<A>;
+        fn add(self, rhs: A) -> Self::Output {
+            Position {
+                x: self.x.into() + rhs,
+                y: self.y.into() + rhs,
+                z: self.z.into() + rhs,
+                t: self.t.into() + rhs,
+            }
+        }
+    }
+    impl<N: Num + Into<A>, A: Num + Copy> Mul<A> for Position<N> {
+        type Output = Position<A>;
+        fn mul(self, rhs: A) -> Self::Output {
+            Position {
+                x: self.x.into() * rhs,
+                y: self.y.into() * rhs,
+                z: self.z.into() * rhs,
+                t: self.t.into() * rhs,
+            }
+        }
+    }
+    impl<N: Ord + Num> PartialOrd for Position<N> {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+            Some(self.cmp(other))
+        }
+    }
+    impl<N: Ord + Num> Ord for Position<N> {
+        fn cmp(&self, other: &Self) -> Ordering {
+            self.z.cmp(&other.z).then(self.y.cmp(&other.y)).then(self.x.cmp(&other.x)).then(self.t.cmp(&other.t))
+        }
+    }
+    /// A trait marking something as a scene object.
+    pub trait Object { }
+    /// A whole scene.
+    pub struct Scene<O: Object, N: Num> {
+        /// A tilemap of the objects in the scene.
+        pub map: ObjectMap<O, N>,
+        /// The attached flags of the scene.
+        pub flags: HashMap<String, Option<String>>,
+    }
+    #[automatically_derived]
+    impl<O: ::core::fmt::Debug + Object, N: ::core::fmt::Debug + Num>
+        ::core::fmt::Debug for Scene<O, N> {
+        #[inline]
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            ::core::fmt::Formatter::debug_struct_field2_finish(f, "Scene",
+                "map", &self.map, "flags", &&self.flags)
+        }
+    }
+    #[automatically_derived]
+    impl<O: ::core::default::Default + Object, N: ::core::default::Default +
+        Num> ::core::default::Default for Scene<O, N> {
+        #[inline]
+        fn default() -> Scene<O, N> {
+            Scene {
+                map: ::core::default::Default::default(),
+                flags: ::core::default::Default::default(),
+            }
+        }
+    }
+    /// A sparse grid of objects in a scene.
+    pub struct ObjectMap<O: Object, N: Num> {
+        /// The width of the map.
+        pub width: usize,
+        /// The height of the map.
+        pub height: usize,
+        /// The time length of the map.
+        pub length: usize,
+        /// A map of positions to objects.
+        pub objects: BTreeMap<Position<N>, O>,
+    }
+    #[automatically_derived]
+    impl<O: ::core::fmt::Debug + Object, N: ::core::fmt::Debug + Num>
+        ::core::fmt::Debug for ObjectMap<O, N> {
+        #[inline]
+        fn fmt(&self, f: &mut ::core::fmt::Formatter) -> ::core::fmt::Result {
+            ::core::fmt::Formatter::debug_struct_field4_finish(f, "ObjectMap",
+                "width", &self.width, "height", &self.height, "length",
+                &self.length, "objects", &&self.objects)
+        }
+    }
+    #[automatically_derived]
+    impl<O: ::core::default::Default + Object, N: ::core::default::Default +
+        Num> ::core::default::Default for ObjectMap<O, N> {
+        #[inline]
+        fn default() -> ObjectMap<O, N> {
+            ObjectMap {
+                width: ::core::default::Default::default(),
+                height: ::core::default::Default::default(),
+                length: ::core::default::Default::default(),
+                objects: ::core::default::Default::default(),
+            }
+        }
+    }
+}
+#[cfg(feature = "bot")]
+pub mod bot {
+    //! This module handles nearly everything with the discord bot.
+    use std::collections::HashSet;
+    use std::env;
+    use std::path::Path;
+    use serenity::all::{Http, StandardFramework};
+    use crate::bot::structures::InitError;
+    pub mod structures {
+        //! Hold data structures for use in the bot.
+        use std::env::VarError;
+        use displaydoc::Display;
+        use thiserror::Error;
+        /// Different things that can go wrong when initializing the bot.
+        pub enum InitError {
+
+            /// bot token environment variable not set: {0}
+            NoToken(
+                #[from]
+                VarError),
+
+            /// serenity error: {0}
+            SerenityError(
+                #[from]
+                serenity::Error),
+        }
+        #[automatically_derived]
+        impl ::core::fmt::Debug for InitError {
+            #[inline]
+            fn fmt(&self, f: &mut ::core::fmt::Formatter)
+                -> ::core::fmt::Result {
+                match self {
+                    InitError::NoToken(__self_0) =>
+                        ::core::fmt::Formatter::debug_tuple_field1_finish(f,
+                            "NoToken", &__self_0),
+                    InitError::SerenityError(__self_0) =>
+                        ::core::fmt::Formatter::debug_tuple_field1_finish(f,
+                            "SerenityError", &__self_0),
+                }
+            }
+        }
+        #[allow(non_upper_case_globals, unused_attributes,
+        unused_qualifications)]
+        const _DERIVE_Display_FOR_InitError: () =
+            {
+                trait DisplayToDisplayDoc {
+                    fn __displaydoc_display(&self)
+                    -> Self;
+                }
+                impl<T: core::fmt::Display> DisplayToDisplayDoc for &T {
+                    fn __displaydoc_display(&self) -> Self { self }
+                }
+                extern crate std;
+                trait PathToDisplayDoc {
+                    fn __displaydoc_display(&self)
+                    -> std::path::Display<'_>;
+                }
+                impl PathToDisplayDoc for std::path::Path {
+                    fn __displaydoc_display(&self) -> std::path::Display<'_> {
+                        self.display()
+                    }
+                }
+                impl PathToDisplayDoc for std::path::PathBuf {
+                    fn __displaydoc_display(&self) -> std::path::Display<'_> {
+                        self.display()
+                    }
+                }
+                impl core::fmt::Display for InitError {
+                    fn fmt(&self, formatter: &mut core::fmt::Formatter)
+                        -> core::fmt::Result {
+
+                        #[allow(unused_variables)]
+                        match self {
+                            Self::NoToken(_0) => {
+                                formatter.write_fmt(format_args!("bot token environment variable not set: {0}",
+                                        _0.__displaydoc_display()))
+                            }
+                            Self::SerenityError(_0) => {
+                                formatter.write_fmt(format_args!("serenity error: {0}",
+                                        _0.__displaydoc_display()))
+                            }
+                        }
+                    }
+                }
+            };
+        #[allow(unused_qualifications)]
+        impl std::error::Error for InitError {
+            fn source(&self)
+                ->
+                    ::core::option::Option<&(dyn std::error::Error + 'static)> {
+                use thiserror::__private::AsDynError as _;
+
+                #[allow(deprecated)]
+                match self {
+                    InitError::NoToken { 0: source, .. } =>
+                        ::core::option::Option::Some(source.as_dyn_error()),
+                    InitError::SerenityError { 0: source, .. } =>
+                        ::core::option::Option::Some(source.as_dyn_error()),
+                }
+            }
+        }
+        #[allow(unused_qualifications)]
+        impl ::core::convert::From<VarError> for InitError {
+            #[allow(deprecated)]
+            fn from(source: VarError) -> Self {
+                InitError::NoToken { 0: source }
+            }
+        }
+        #[allow(unused_qualifications)]
+        impl ::core::convert::From<serenity::Error> for InitError {
+            #[allow(deprecated)]
+            fn from(source: serenity::Error) -> Self {
+                InitError::SerenityError { 0: source }
+            }
+        }
+    }
+    pub mod hooks {
+        //! Holds event hooks for the bot.
+        use serenity::all::{Message, StandardFramework};
+        use serenity::framework::standard::macros::hook;
+        use serenity::framework::standard::CommandError;
+        use serenity::prelude::*;
+        use crate::bot::groups;
+        #[allow(missing_docs)]
+        fn after<'fut>(ctx: &'fut Context, message: &'fut Message,
+            cmd_name: &'fut str, error: Result<(), CommandError>)
+            ->
+                std::pin::Pin<Box<dyn std::future::Future<Output = ()> +
+                Send + 'fut>> {
+            Box::pin(async move
+                    {
+                    let _output: () = {};
+
+                    #[allow(unreachable_code)]
+                    _output
+                })
+        }
+        #[allow(missing_docs)]
+        fn before<'fut>(ctx: &'fut Context, msg: &'fut Message,
+            command_name: &'fut str)
+            ->
+                std::pin::Pin<Box<dyn std::future::Future<Output = bool> +
+                Send + 'fut>> {
+            Box::pin(async move
+                    {
+                    let _output: bool =
+                        {
+                            {
+                                ::std::io::_print(format_args!("Got command \'{0}\' by user \'{1}\'\n",
+                                        command_name, msg.author.name));
+                            };
+                            true
+                        };
+
+                    #[allow(unreachable_code)]
+                    _output
+                })
+        }
+        /// Sets up the given framework for the bot.
+        pub(crate) async fn setup_framework() -> StandardFramework {
+            StandardFramework::new().group(&groups::general::GENERAL_GROUP)
+        }
+    }
+    mod groups {
+        pub(crate) mod general {
+            use serenity::all::Message;
+            use serenity::framework::standard::CommandResult;
+            use serenity::framework::standard::macros::{command, group};
+            use serenity::prelude::*;
+            #[allow(missing_docs)]
+            pub static GENERAL_GROUP_OPTIONS:
+                serenity::framework::standard::GroupOptions =
+                serenity::framework::standard::GroupOptions {
+                    prefixes: &[],
+                    only_in: serenity::framework::standard::OnlyIn::None,
+                    owners_only: false,
+                    owner_privilege: false,
+                    help_available: true,
+                    allowed_roles: &[],
+                    required_permissions: serenity::model::permissions::Permissions::from_bits_truncate(0u64),
+                    checks: &[],
+                    default_command: None,
+                    description: None,
+                    summary: None,
+                    commands: &[&PING_COMMAND],
+                    sub_groups: &[],
+                };
+            #[allow(missing_docs)]
+            pub static GENERAL_GROUP:
+                serenity::framework::standard::CommandGroup =
+                serenity::framework::standard::CommandGroup {
+                    name: "General",
+                    options: &GENERAL_GROUP_OPTIONS,
+                };
+            pub(crate) struct General;
+            #[allow(missing_docs)]
+            pub static PING_COMMAND_OPTIONS:
+                serenity::framework::standard::CommandOptions =
+                serenity::framework::standard::CommandOptions {
+                    checks: &[],
+                    bucket: None,
+                    names: &["ping"],
+                    desc: None,
+                    delimiters: &[],
+                    usage: None,
+                    examples: &[],
+                    min_args: None,
+                    max_args: None,
+                    allowed_roles: &[],
+                    required_permissions: serenity::model::permissions::Permissions::from_bits_truncate(0u64),
+                    help_available: true,
+                    only_in: serenity::framework::standard::OnlyIn::None,
+                    owners_only: false,
+                    owner_privilege: false,
+                    sub_commands: &[],
+                };
+            #[allow(missing_docs)]
+            pub static PING_COMMAND: serenity::framework::standard::Command =
+                serenity::framework::standard::Command {
+                    fun: ping,
+                    options: &PING_COMMAND_OPTIONS,
+                };
+            #[allow(missing_docs)]
+            fn ping<'fut>(ctx: &'fut Context, msg: &'fut Message,
+                _args: serenity::framework::standard::Args)
+                ->
+                    std::pin::Pin<Box<dyn std::future::Future<Output =
+                    CommandResult> + Send + 'fut>> {
+                Box::pin(async move
+                        {
+                        let _output: CommandResult =
+                            {
+                                const _: fn() =
+                                    ||
+                                        {
+                                            {
+                                                trait TypeEq {
+                                                    type This: ?Sized;
+                                                }
+                                                impl<T: ?Sized> TypeEq for T {
+                                                    type This = Self;
+                                                }
+                                                fn assert_type_eq_all<T, U>() where T: ?Sized +
+                                                    TypeEq<This = U>, U: ?Sized {}
+                                                assert_type_eq_all::<CommandResult,
+                                                        serenity::framework::standard::CommandResult>();
+                                            }
+                                        };
+                                const _: fn() =
+                                    ||
+                                        {
+                                            {
+                                                trait TypeEq {
+                                                    type This: ?Sized;
+                                                }
+                                                impl<T: ?Sized> TypeEq for T {
+                                                    type This = Self;
+                                                }
+                                                fn assert_type_eq_all<T, U>() where T: ?Sized +
+                                                    TypeEq<This = U>, U: ?Sized {}
+                                                assert_type_eq_all::<&Message,
+                                                        &serenity::model::channel::Message>();
+                                            }
+                                        };
+                                const _: fn() =
+                                    ||
+                                        {
+                                            {
+                                                trait TypeEq {
+                                                    type This: ?Sized;
+                                                }
+                                                impl<T: ?Sized> TypeEq for T {
+                                                    type This = Self;
+                                                }
+                                                fn assert_type_eq_all<T, U>() where T: ?Sized +
+                                                    TypeEq<This = U>, U: ?Sized {}
+                                                assert_type_eq_all::<&Context,
+                                                        &serenity::client::Context>();
+                                            }
+                                        };
+                                msg.channel_id.say(&ctx.http, "Pong! : )").await?;
+                                Ok(())
+                            };
+
+                        #[allow(unreachable_code)]
+                        _output
+                    })
+            }
+        }
+    }
+    pub struct Bot;
+    /// Initializes the bot, without starting it.
+    ///
+    /// # Notes
+    /// If using [`dotenv`], be sure to initialize it before calling this!
+    pub async fn init(config_path: impl AsRef<Path>)
+        -> Result<Bot, InitError> {
+        let token = env::var("CHILL_TOKEN")?;
+        let http = Http::new(&token);
+        let (owners, bot_user) =
+            {
+                let info = http.get_current_application_info().await?;
+                let mut owners = HashSet::new();
+                if let Some(team) = info.team {
+                        owners.insert(team.owner_user_id);
+                    } else if let Some(owner) = &info.owner {
+                       owners.insert(owner.id);
+                   }
+                let bot_user = http.get_current_user().await?;
+                (owners, bot_user)
+            };
+        let mut framework = hooks::setup_framework().await;
+        ::core::panicking::panic("not yet implemented")
+    }
+}
