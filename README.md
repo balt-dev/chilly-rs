@@ -9,4 +9,4 @@ I've decided to switch to Rust for this, as I enjoy the language more.
 
 
 
-https://github.dev/balt-dev/chilly
+https://github.com/balt-dev/chilly
