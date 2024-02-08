@@ -1,0 +1,14 @@
+[foo]
+color = [0, 3]
+sprite = "foosprite"
+tiling = -1
+author = "baltdev"
+
+[bar]
+color = [255, 255, 128]
+sprite = "barsprite"
+tiling = 3
+tile_index = [0, 0]
+object_id = "object999"
+layer = 255
+author = "baltdev"

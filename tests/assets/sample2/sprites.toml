@@ -1,0 +1,5 @@
+[baz]
+color = [2, 2]
+sprite = "bazaz"
+tiling = 2
+author = "totally not balt"
