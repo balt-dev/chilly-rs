@@ -21,3 +21,7 @@ Cargo.lock
 # For shuttle
 
 crates/bot/Secrets.dev.toml
+
+# Development vanilla path
+
+/baba

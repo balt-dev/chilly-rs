@@ -159,7 +159,6 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
         );
     let tiles = tilemap_iter.flat_map(|iter| {
         let iter_len = iter.len();
-        dbg!(iter_len, length);
         let nonstop_iter = iter.map(Some).pad_using(length, |_| None);
         // We currently have an iterator over every tile in this animation cell
         nonstop_iter.scan(None, |last_tile: &mut Option<(Position<usize>, RawTile)>, maybe_tile| {
@@ -167,7 +166,6 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
                 // Reached the end but there's still more frames
                 // Fill with the last, if it exists
                 let mut last = last_tile.clone();
-                eprintln!("{last:?}");
                 if let Some((ref mut pos, _)) = last {
                     pos.t += 1; // Increment the frame counter so it's not on the same frame
                 }

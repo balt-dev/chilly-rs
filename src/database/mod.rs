@@ -23,3 +23,10 @@ pub struct Database {
     /// A mapping of tile names to their data.
     pub tiles: HashMap<String, TileData>
 }
+
+impl Database {
+    /// Creates a new, empty database.
+    pub fn new() -> Self {
+        Self::default()
+    }
+}

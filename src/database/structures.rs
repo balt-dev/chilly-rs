@@ -172,7 +172,7 @@ impl<'de> de::Visitor<'de> for ColorVisitor {
         let el_1 = seq.next_element::<u8>()?.ok_or(de_throw!("{WRONG_LEN}"))?;
         let el_2 = seq.next_element::<u8>()?.ok_or(de_throw!("{WRONG_LEN}"))?;
         let el_3 = seq.next_element::<u8>()?;
-        if seq.next_element::<u8>()?.is_none() {
+        if seq.next_element::<u8>()?.is_some() {
             return Err(de_throw!("{WRONG_LEN}"))
         }
         let elements = (el_1, el_2, el_3);
@@ -199,17 +199,23 @@ pub struct TileData {
     pub color: Color,
     /// The sprite filename of the tile
     pub sprite: String,
-    /// The world that the tile resides in
-    pub world: String,
+    /// The directory that the tile resides in
+    // This shouldn't be specified in a sprites.toml,
+    // but should be in the binary database dump.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub directory: String,
     /// The tiling mode that the tile uses
     pub tiling: Tiling,
     /// Who created the tile
     pub author: String,
     /// The tile's index into Baba Is You's internal tile grid
+    #[cfg_attr(feature = "serde", serde(default))]
     pub tile_index: Option<(u8, u8)>,
     /// The tile's internal object representation in Baba Is You
+    #[cfg_attr(feature = "serde", serde(default))]
     pub object_id: Option<String>,
     /// The z layer of this tile (only used in levels)
+    #[cfg_attr(feature = "serde", serde(default))]
     pub layer: Option<u8>
 }
 
@@ -218,7 +224,7 @@ impl Default for TileData {
         Self {
             color: Color::Paletted {x: 0, y: 3},
             sprite: "error".to_string(),
-            world: "vanilla".to_string(),
+            directory: "vanilla".to_string(),
             tiling: Tiling::None,
             author: "Hempuli".to_string(),
             tile_index: None,
