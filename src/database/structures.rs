@@ -41,6 +41,22 @@ pub enum Tiling {
     Animated = 4,
 }
 
+impl TryFrom<i8> for Tiling {
+    type Error = i8;
+
+    fn try_from(value: i8) -> Result<Self, Self::Error> {
+        Ok( match value {
+            -1 => Tiling::None,
+            0 => Tiling::Directional,
+            1 => Tiling::AutoTiled,
+            2 => Tiling::Character,
+            3 => Tiling::AnimDir,
+            4 => Tiling::Animated,
+            _ => return Err(value)
+        } )
+    }
+}
+
 #[cfg(feature = "serde")]
 macro_rules! de_throw {
     ($($tt: tt)+) => {

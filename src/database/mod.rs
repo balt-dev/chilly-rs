@@ -14,11 +14,9 @@ mod assets;
 /// Chilly's internal database.
 ///
 /// # Notes
-/// Does not derive [`Clone`] on purpose.
-///
-/// This is expected to be a VERY large value, so cloning the entire database is unwise.
+/// This is expected to be a VERY large value, so cloning a filled database is unwise.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, PartialEq, Eq, Default)]
+#[derive(Debug, PartialEq, Eq, Default, Clone)]
 pub struct Database {
     /// A mapping of tile names to their data.
     pub tiles: HashMap<String, TileData>
@@ -26,6 +24,7 @@ pub struct Database {
 
 impl Database {
     /// Creates a new, empty database.
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

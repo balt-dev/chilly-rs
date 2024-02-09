@@ -15,6 +15,19 @@ tileslist =
 		grid = {0, 1},
 		layer = 18,
 	},
+	object950 =
+	{
+		name = "sample2",
+		sprite = "sample2",
+		sprite_in_root = true,
+		unittype = "object",
+		tiling = 1,
+		type = 0,
+		colour = {3, 2},
+		tile = {1, 1},
+		grid = {0, 1},
+		layer = 18,
+	},
 }
 
 
