@@ -4,10 +4,15 @@
 use std::collections::{BTreeMap, HashMap};
 use itertools::Itertools;
 use num_traits::Num;
-use pest::error::{ErrorVariant, Error};
-use pest::iterators::Pair;
-use pest::Parser;
-use crate::structures::{Position, Object, Scene, ObjectMap};
+use pest::{
+    error::{Error, ErrorVariant},
+    iterators::Pair,
+    Parser
+};
+use crate::structures::{
+    Position, Object,
+    Scene, ObjectMap
+};
 
 mod scene {
     #![allow(missing_docs)]

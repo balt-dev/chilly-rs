@@ -1,11 +1,13 @@
 #![cfg(feature = "assets")]
 //! Handles loading and scraping of external assets into the database.
 
-use std::collections::HashMap;
-use std::io::Read;
-use std::{fs, io};
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+use std::{
+    collections::{BTreeSet, HashMap},
+    fs,
+    io::{self, Read},
+    path::{Path, PathBuf},
+    str::FromStr
+};
 use displaydoc::Display;
 use itertools::Itertools;
 use regex_lite::Regex;
@@ -31,10 +33,11 @@ pub enum LoadError {
     #[displaydoc("Decoding error: {0}")]
     /// Error when decoding a TOML file
     TomlError(#[from] toml::de::Error),
+    #[displaydoc("Couldn't find data object {0} in lua file {1}")]
     /// Couldn't find data object in lua file
-    LuaDataNotFound,
-    /// A lua file was invalid.
-    InvalidLua,
+    LuaDataNotFound(&'static str, PathBuf),
+    /// A lua file was invalid: {0}
+    InvalidLua(&'static str),
 }
 
 impl Database {
@@ -104,22 +107,37 @@ impl Database {
             )))
     }
 
+    /// Parse a string vector from Lua.
+    fn parse_lua_strings(col: &&str) -> Option<BTreeSet<String>> {
+        col // Strip braces
+            .strip_prefix('{')
+            .and_then(|col| col.strip_suffix('}'))
+            // Split by comma
+            .map(|col| col.split(','))
+            // Strip quotes
+            .map(|strings| {
+                strings.map(|string| 
+                    string.trim().trim_matches('"').to_string()
+                ).collect()
+            })
+    }
+
     /// Loads assets from `values.lua`.
     fn load_vanilla_values(&mut self, path: PathBuf) -> Result<(), LoadError> {
         // Read the file
         let mut file_buf = String::new();
-        let mut f = fs::File::open(path)?;
+        let mut f = fs::File::open(&path)?;
         f.read_to_string(&mut file_buf)?;
         drop(f); // Close immediately
 
         // Find the start and end of the tiles list
-        let start = file_buf.find("tileslist =\n{")
-            .ok_or(LoadError::LuaDataNotFound)?;
-        let end = file_buf[start..].find("}\n}")
-            .ok_or(LoadError::LuaDataNotFound)?;
+        let start = file_buf.find("tileslist =\n{\n\t")
+            .ok_or(LoadError::LuaDataNotFound("tileslist", path.clone()))?;
+        let end = file_buf[start..].find("},\n}")
+            .ok_or(LoadError::LuaDataNotFound("tileslist", path.clone()))?;
         // Slice the string to the tiles list
         // We add 13 to get to the end of start's pattern string
-        let tileslist_string = &file_buf[start + 13 .. end];
+        let tileslist_string = &file_buf[start + 15 .. end];
         let tiles = regex!(r"(?s-u)(\w+) =\n\t\{\s+([[:ascii:]]+?\n)\t\},")
             .captures_iter(tileslist_string)
             .map(|c| c.extract())
@@ -131,7 +149,7 @@ impl Database {
                         .map(|c| c.extract())
                         .map(|(_, [key, value])| (key, value))
                         .collect();
-                (Some(object_id), tile_props)
+                (Some(object_id.trim_matches('"')), tile_props)
             })
             // Filter out the nonexistent tiles
             .filter(|(_, props)| props.get("does_not_exist").is_none())
@@ -149,39 +167,53 @@ impl Database {
         // Parse name
         let name = (
             *props.get("name")
-            .ok_or(LoadError::InvalidLua)?
-        ).to_string();        // Parse color
-        let (color_x, color_y) = props.get("color")
+            .ok_or(LoadError::InvalidLua("no name"))?
+        ).trim_matches('"').to_string();        // Parse color
+        // Parse color
+        let (color_x, color_y) = props.get("colour_active")
+            .or(props.get("colour"))
             .and_then(Database::parse_lua_vec2)
-            .ok_or(LoadError::InvalidLua)?;
+            .ok_or(LoadError::InvalidLua("no color"))?;
         let color = Color::Paletted {x: color_x, y: color_y};
         // Parse tiling
         let tiling_num = props.get("tiling")
             .copied()
             .map(i8::from_str)
-            .transpose().ok().flatten().ok_or(LoadError::InvalidLua)?;
+            .transpose().ok().flatten().ok_or(LoadError::InvalidLua("invalid tiling"))?;
         let tiling = Tiling::try_from(tiling_num)
-            .map_err(|_| LoadError::InvalidLua)?;
+            .map_err(|_| LoadError::InvalidLua("no tiling"))?;
         // Parse author
         let author = (
             *props.get("author")
-            .ok_or(LoadError::InvalidLua)?
-        ).to_string();
+            .unwrap_or(&"Hempuli")
+        ).trim_matches('"').to_string();
         // Parse sprite
         let sprite = (
             *props.get("sprite").or(props.get("name"))
-            .ok_or(LoadError::InvalidLua)?
-        ).to_string();
+            .ok_or(LoadError::InvalidLua("no name"))?
+        ).trim_matches('"').to_string();
         // Parse tile index, if it's there
         let tile_index = props.get("tile")
             .map(Database::parse_lua_vec2)
-            .map(|opt| opt.ok_or(LoadError::InvalidLua))
+            .map(|opt| opt.ok_or(LoadError::InvalidLua("invalid tile index")))
+            .transpose()?;
+        // Parse grid index, if it's there
+        let grid_index = props.get("griid")
+            .map(Database::parse_lua_vec2)
+            .map(|opt| opt.ok_or(LoadError::InvalidLua("invalid grid index")))
             .transpose()?;
         // Parse the layer, if it's there
         let layer = props.get("layer")
             .copied()
             .map(u8::from_str)
-            .transpose().map_err(|_| LoadError::InvalidLua)?;
+            .transpose().map_err(|_| LoadError::InvalidLua("invalid layer number"))?;
+        // Parse the tags, if they're there
+        let tags = props.get("tile")
+            .map(Database::parse_lua_strings)
+            .map(|opt| opt.ok_or(LoadError::InvalidLua("invalid tag list")))
+            .transpose()?
+            // If there's no tags, make it the empty vector
+            .unwrap_or_default();
         // Construct it (finally)
         Ok((name, TileData {
             color,
@@ -190,8 +222,10 @@ impl Database {
             tiling,
             author,
             tile_index,
+            grid_index,
             object_id: object_id.map(String::from),
             layer,
+            tags
         }))
     }
 
@@ -199,9 +233,54 @@ impl Database {
     fn load_vanilla_objlist(&mut self, path: PathBuf) -> Result<(), LoadError> {
         // Read the file
         let mut file_buf = String::new();
-        let mut f = fs::File::open(path)?;
+        let mut f = fs::File::open(&path)?;
         f.read_to_string(&mut file_buf)?;
         drop(f); // Close immediately
-        todo!()
+        
+        // Find the start and end of the tiles list
+        // Offset the start by the match string's length
+        let start = file_buf.find("editor_objlist = {\n\t")
+            .ok_or(LoadError::LuaDataNotFound("editor_objlist", path.clone()))? + 20;
+        let end = file_buf[start..].find(",\n}")
+            .ok_or(LoadError::LuaDataNotFound("editor_objlist", path.clone()))?;
+
+        // Slice the string to the object list
+        let objlist_string = &file_buf[start .. end];
+        let tiles = regex!(r"(?s)\[\d+?] = \{(.+?)\t\},")
+            .captures_iter(objlist_string)
+            .map(|c| c.extract())
+            .map(|(_, [tile_string])| {
+                // Match for the properties of the tile
+                let tile_props: HashMap<&str, &str> =
+                    regex!(r"(\w+) = (.+?),\n")
+                        .captures_iter(tile_string)
+                        .map(|c| c.extract())
+                        .map(|(_, [key, value])| (key, value))
+                        .collect();
+                (None, tile_props)
+            })
+            // Filter out the nonexistent tiles
+            .filter(|(_, props)| props.get("does_not_exist").is_none())
+            // Parse the id and props to a TileData
+            .map(|(id, props)| Database::parse_data_from_strings(id, &props))
+            .collect::<Result<HashMap<String, TileData>, LoadError>>()?;
+        // It'd be really nice if we didn't have to collect in the middle,
+        // but sadly, the error needs to propagate somehow.
+        for (name, data) in tiles {
+            let entry = self.tiles.entry(name).or_default();
+            *entry = TileData {
+                color: data.color,
+                sprite: data.sprite,
+                directory: data.directory,
+                tiling: data.tiling,
+                author: data.author,
+                tile_index: data.tile_index.or(entry.tile_index),
+                grid_index: data.grid_index.or(entry.grid_index),
+                object_id: data.object_id.or(entry.object_id.clone()),
+                layer: data.layer.or(entry.layer),
+                tags: data.tags.union(&entry.tags).cloned().collect(),
+            };
+        }
+        Ok(())
     }
 }

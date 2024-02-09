@@ -14,6 +14,7 @@ tileslist =
 		tile = {1, 0},
 		grid = {0, 1},
 		layer = 18,
+		tags = {"tag1","tag2"}
 	},
 	object950 =
 	{
@@ -25,8 +26,8 @@ tileslist =
 		type = 0,
 		colour = {3, 2},
 		tile = {1, 1},
-		grid = {0, 1},
-		layer = 18,
+		grid = {0, 2},
+		layer = 16,
 	},
 }
 

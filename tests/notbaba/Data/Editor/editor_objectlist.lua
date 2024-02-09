@@ -4,6 +4,7 @@
 editor_objlist = {
 	[1] = {
 		name = "editor_sample",
+		sample = "ed_sprite"
 		unittype = "object",
 		tags = {"tag1","tag2","tag3"},
 		tiling = -1,

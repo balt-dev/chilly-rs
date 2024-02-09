@@ -1,4 +1,4 @@
-use std::{collections::HashMap, path::PathBuf};
+use std::{collections::{BTreeSet, HashMap}, path::PathBuf};
 
 use chilly::database::{
     structures::{Color, TileData, Tiling},
@@ -22,6 +22,7 @@ fn main() -> ExitCode {
     }
 }
 
+#[cfg(feature = "assets")]
 fn _main() -> Result<(), Box<dyn std::error::Error>> {
     let mut database = Database::new();
     // Get testing assets directory
@@ -48,7 +49,8 @@ fn _main() -> Result<(), Box<dyn std::error::Error>> {
                 author: "baltdev".into(),
                 tile_index: Some((0, 0)),
                 object_id: Some("object999".into()),
-                layer: Some(255)
+                layer: Some(255),
+                ..Default::default()
             }),
             ("baz".into(), TileData {
                 color: Color::Paletted { x: 2, y: 2 },
@@ -56,6 +58,40 @@ fn _main() -> Result<(), Box<dyn std::error::Error>> {
                 directory: "sample2".into(),
                 tiling: Tiling::Character,
                 author: "totally not balt".into(),
+                ..Default::default()
+            }),
+            ("sample".into(), TileData {
+                color: Color::Paletted { x: 2, y: 2 },
+                sprite: "sample".into(),
+                directory: "vanilla".into(),
+                tiling: Tiling::Character,
+                author: "Hempuli".into(),
+                layer: Some(18),
+                tile_index: Some((1, 0)),
+                grid_index: Some((0, 1)),
+                object_id: Some("object999".into()),
+                tags: BTreeSet::from(["tag1".into(), "tag2".into()])
+            }),
+            ("sample2".into(), TileData {
+                color: Color::Paletted { x: 3, y: 2 },
+                sprite: "sample2".into(),
+                directory: "vanilla".into(),
+                tiling: Tiling::AutoTiled,
+                author: "Hempuli".into(),
+                layer: Some(16),
+                tile_index: Some((1, 1)),
+                grid_index: Some((0, 2)),
+                object_id: Some("object950".into()),
+                tags: BTreeSet::new()
+            }),
+            ("editor_sample".into(), TileData {
+                color: Color::Paletted { x: 2, y: 3 },
+                sprite: "ed_sprite".into(),
+                directory: "vanilla".into(),
+                tiling: Tiling::None,
+                author: "Hempuli".into(),
+                layer: Some(17),
+                tags: BTreeSet::from(["tag1".into(), "tag2".into(), "tag3".into()]),
                 ..Default::default()
             })
         ])

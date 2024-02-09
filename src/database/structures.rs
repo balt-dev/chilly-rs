@@ -1,8 +1,10 @@
 //! Data structures for use within the database.
 
-use core::fmt;
-use std::fmt::{Display, Formatter};
-use std::str::FromStr;
+use core::{
+    fmt::{self, Display, Formatter},
+    str::FromStr
+};
+use std::collections::BTreeSet;
 use displaydoc::Display;
 
 #[cfg(feature = "serde")]
@@ -227,12 +229,19 @@ pub struct TileData {
     /// The tile's index into Baba Is You's internal tile grid
     #[cfg_attr(feature = "serde", serde(default))]
     pub tile_index: Option<(u8, u8)>,
+    /// The default index into the editor grid of this tile in Baba Is You
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub grid_index: Option<(u8, u8)>,
     /// The tile's internal object representation in Baba Is You
     #[cfg_attr(feature = "serde", serde(default))]
     pub object_id: Option<String>,
     /// The z layer of this tile (only used in levels)
     #[cfg_attr(feature = "serde", serde(default))]
-    pub layer: Option<u8>
+    pub layer: Option<u8>,
+    /// The tags of this sprite
+    #[cfg_attr(feature = "serde", serde(default))]
+    // Use a BTreeSet to allow hashing
+    pub tags: BTreeSet<String>
 }
 
 impl Default for TileData {
@@ -244,8 +253,10 @@ impl Default for TileData {
             tiling: Tiling::None,
             author: "Hempuli".to_string(),
             tile_index: None,
+            grid_index: None,
             object_id: None,
             layer: None,
+            tags: BTreeSet::new()
         }
     }
 }
