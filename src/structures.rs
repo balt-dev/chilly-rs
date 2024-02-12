@@ -6,7 +6,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Mul};
 use num_traits::Num;
 
-#[derive(Copy, Clone, PartialEq, Eq, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Default, Hash)]
 #[allow(missing_docs)]
 /// A four-dimensional position of an object in a scene.
 pub struct Position<N: Num> {
@@ -81,17 +81,8 @@ impl<N: Ord + Num> Ord for Position<N> {
 /// A trait marking something as a scene object.
 pub trait Object {}
 
-/// A whole scene.
-#[derive(Debug, Default)]
-pub struct Scene<O: Object, N: Num> {
-    /// A tilemap of the objects in the scene.
-    pub map: ObjectMap<O, N>,
-    /// The attached flags of the scene.
-    pub flags: HashMap<String, Option<String>>
-}
-
 /// A sparse grid of objects in a scene.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 pub struct ObjectMap<O: Object, N: Num> {
     /// The width of the map.
     pub width: usize,
@@ -101,4 +92,15 @@ pub struct ObjectMap<O: Object, N: Num> {
     pub length: usize,
     /// A map of positions to objects.
     pub objects: BTreeMap<Position<N>, O>
+}
+
+impl<N: Num, O: Object> Default for ObjectMap<O, N> {
+    fn default() -> Self {
+        Self {
+            width: 0,
+            height: 0,
+            length: 0,
+            objects: BTreeMap::new()
+        }
+    }
 }

@@ -1,6 +1,13 @@
 //! Handles tilemap parsing.
 // This is put inside a bot for organization with the pest grammar file.
 
+mod structures;
+pub use structures::{
+    TileTag,
+    RawScene,
+    RawTile
+};
+
 use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use itertools::Itertools;
@@ -11,8 +18,8 @@ use pest::{
     Parser
 };
 use crate::structures::{
-    Position, Object,
-    Scene, ObjectMap
+    Position,
+    ObjectMap
 };
 
 mod scene {
@@ -53,29 +60,6 @@ mod scene {
 }
 use scene::Rule;
 use crate::variants::{Variant, VariantError, VariantName};
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
-/// A tag for a tile.
-#[non_exhaustive]
-pub enum TileTag {
-    /// Prepends `text_` to a tile's name, or removes it if in text mode alredy.
-    Text,
-    /// Prepends `glyph_` to a tile's name.
-    Glyph
-}
-
-#[derive(Debug, Clone, PartialEq)]
-/// An unparsed tile.
-pub struct RawTile<'scene> {
-    /// The tile's name.
-    pub name: &'scene str,
-    /// The tag the tile may have.
-    pub tag: Option<TileTag>,
-    /// The tile's variants.
-    pub variants: Vec<Variant>
-}
-
-impl<'s> Object for RawTile<'s> {}
 
 /// Formats a pest error for better readability.
 fn handle_error(error: Error<Rule>) -> Error<Rule> {
@@ -137,12 +121,12 @@ fn unescape(string: &str) -> Cow<str> {
     }
 }
 
-/// Parses a scene.
+/// Parses a raw scene.
 ///
 /// # Errors
 /// Errors if the scene fails to parse.
 #[allow(clippy::result_large_err, clippy::missing_panics_doc)]
-pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
+pub fn parse<'a>(scene: &'a str) -> Result<RawScene<'a>, Error<Rule>> {
     // I'll be perfectly honest here.
     // Using pest here is overkill.
     // But, I like using it, so I'm using it.
@@ -203,7 +187,6 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
             let (pos, current_obj) = maybe_tile.unwrap();
             let mut pairs = current_obj.into_inner();
             let object = pairs.next().unwrap();
-            let obj_span = object.as_span();
             let variants = pairs.next().unwrap();
             // Check what this object actually is
             if object.as_rule() != Rule::tile {
@@ -238,7 +221,7 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
         .map(|res| res.map(|opt| opt.expect("we filtered out the Nones earlier")))// Remove the Nones
         .collect::<Result<BTreeMap<_, _>, Error<Rule>>>()?;
 
-    Ok(Scene {
+    Ok(RawScene {
         map: ObjectMap {
             width,
             height,

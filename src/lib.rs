@@ -8,3 +8,4 @@ pub mod structures;
 pub mod database;
 pub mod variants;
 pub mod varargs;
+pub mod solidify;
