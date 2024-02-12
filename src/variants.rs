@@ -10,11 +10,12 @@ use crate::varargs::{
 };
 
 /// Something went wrong while parsing a variant.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Error, Display)]
+#[derive(Debug, Error, Display)]
 pub enum VariantError {
     /// An argument of this variant was invalid.
-    #[displaydoc("Argument {0} of this variant was invalid.")]
-    InvalidArgument(usize),
+    /// Supplies the original reason for the failure.
+    #[displaydoc("Argument {0} of this variant was invalid: {1}")]
+    InvalidArgument(usize, Box<dyn std::error::Error>),
     /// The variant name does not exist.
     #[displaydoc("The variant {0} does not exist.")]
     NonExistentVariant(String)
@@ -111,11 +112,15 @@ macro_rules! variants {
     // Parse a single variant argument, moving on to the next
     (parse $name: ident $args: ident; $ty: ty $(, $($tys: ty),+)?; $count: ident; $($argname: ident)* ) => { paste! {
 
-        let [< arg_ $count >] = <$ty>::parse(&mut $args)
-            .ok_or(VariantError::InvalidArgument(
-                variants!{count $($argname)*}
-            )
-        )?;
+        let [< arg_ $count >] = match <$ty>::parse(&mut $args) {
+            Ok(v) => v,
+            Err(err) => {
+                return Err(VariantError::InvalidArgument(
+                    variants!{count $($argname)*},
+                    err
+                ))
+            }
+        };
 
         variants!{ parse $name $args; $($($tys),+)?; [< $count n >]; $($argname)* [< arg_ $count >] }
     } };
@@ -137,14 +142,27 @@ variants! {
         [Option<u8>, Option<MetaKernel>, Option<u8>]
     },
     {
+        Noop,
+        [""],
+        "Does nothing. Useful for resetting variants on animations.",
+        []
+    },
+    {
         Argless,
         ["test"],
         "No argument test",
         []
+    },
+    {
+        MandArgs,
+        ["mand"],
+        "Mandatory args",
+        [u8, Option<u8>]
     }
 }
 
 /// Holds the data behind one variant.
+/// Should mostly be used for runtime documentation in a GUI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct VariantData {
     name: VariantName,

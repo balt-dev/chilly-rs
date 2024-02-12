@@ -1,6 +1,7 @@
 //! Holds different classes and traits relating to variant arguments.
 
 use std::str::FromStr;
+use anyhow::anyhow;
 
 mod sealed {
     use crate::varargs::MetaKernel;
@@ -8,8 +9,11 @@ mod sealed {
     pub trait Sealed {}
     impl Sealed for MetaKernel {}
     impl Sealed for u8 {}
+    impl Sealed for f32 {}
     impl<T: Sealed> Sealed for Option<T> {}
 }
+
+type BoxedErr = Box<dyn std::error::Error>;
 
 /// A trait that dictates that this object is available for
 /// parsing as a variant argument.
@@ -21,17 +25,22 @@ pub trait VariantArgument: sealed::Sealed + Sized {
     /// Parses values from the iterator until this type can be constructed.
     ///
     /// Returns None if failed.
-    fn parse<'a>(args: impl Iterator<Item = &'a str>) -> Option<Self>;
+    fn parse<'a>(args: impl Iterator<Item = &'a str>) -> Result<Self, BoxedErr>;
 }
+
 
 macro_rules! arg_unit_enum {
     ($name: ident : $($string: literal => $var: ident),+$(,)?) => {
         impl VariantArgument for $name {
-            fn parse<'a>(mut args: impl Iterator<Item=&'a str>) -> Option<Self> {
-                let arg = args.next()?;
-                Some( match arg {
+            fn parse<'a>(mut args: impl Iterator<Item=&'a str>) -> Result<Self, BoxedErr> {
+                let arg = args.next().ok_or(
+                    anyhow!("argument of type \"{}\" not supplied", stringify!($name))
+                )?;
+                Ok( match arg {
                     $($string => Self::$var,)+
-                    _ => return None
+                    _ => return Err(
+                        anyhow!("must be one of: {}", [$($string),+].join(", ")).into()
+                    )
                 } )
             }
         }
@@ -41,18 +50,20 @@ macro_rules! arg_unit_enum {
 macro_rules! arg_from_str {
     ($($ty: ty)+) => { $(
         impl VariantArgument for $ty {
-            fn parse<'a>(mut args: impl Iterator<Item=&'a str>) -> Option<Self> {
-                let arg = args.next()?;
-                <$ty>::from_str(arg).ok()
+            fn parse<'a>(mut args: impl Iterator<Item=&'a str>) -> Result<Self, BoxedErr> {
+                let arg = args.next().ok_or(
+                    anyhow!("argument of type \"{}\" not supplied", stringify!($ty))
+                )?;
+                Ok(<$ty>::from_str(arg)?)
             }
         }
     )+ };
 }
 
 impl<T: VariantArgument + sealed::Sealed> VariantArgument for Option<T> {
-    fn parse<'a>(mut args: impl Iterator<Item=&'a str>) -> Option<Self> {
+    fn parse<'a>(mut args: impl Iterator<Item=&'a str>) -> Result<Self, BoxedErr> {
         let Some(arg) = args.next() else {
-            return Some(None)
+            return Ok(None)
         };
         T::parse([arg].into_iter()).map(Some)
     }
@@ -79,5 +90,5 @@ arg_unit_enum!{
 }
 
 arg_from_str! {
-    u8
+    u8 f32
 }

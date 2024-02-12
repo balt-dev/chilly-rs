@@ -34,21 +34,6 @@ impl<N: Display + Num> Display for Position<N> {
     }
 }
 
-impl<N> Position<N> where N: Num {
-    /// Converts this position into another numeric representation.
-    ///
-    /// # Notes
-    /// This cannot be a basic From implementation, as From can't blanket all types.
-    pub fn into<O: From<N> + Num>(self) -> Position<O> {
-        Position {
-            x: self.x.into(),
-            y: self.y.into(),
-            z: self.z.into(),
-            t: self.t.into()
-        }
-    }
-}
-
 impl<N: Num + Into<A>, A: Num + Copy> Add<A> for Position<N> {
     type Output = Position<A>;
 
@@ -75,10 +60,13 @@ impl<N: Num + Into<A>, A: Num + Copy> Mul<A> for Position<N> {
     }
 }
 
-impl<N: Ord + Num> PartialOrd for Position<N> {
+impl<N: PartialOrd + Num> PartialOrd for Position<N> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
+        self.z.partial_cmp(&other.z)
+            .and_then(|ord| Some(ord.then(self.y.partial_cmp(&other.y)?)))
+            .and_then(|ord| Some(ord.then(self.x.partial_cmp(&other.x)?)))
+            .and_then(|ord| Some(ord.then(self.t.partial_cmp(&other.t)?)))
+        }
 }
 
 impl<N: Ord + Num> Ord for Position<N> {

@@ -222,12 +222,7 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
             let parsed = parse_tile(last_tile, tag, name, variants);
             let Ok(parsed) = parsed else {
                 let err = parsed.unwrap_err();
-                return Some(Err(Error::new_from_span(
-                    ErrorVariant::CustomError {
-                        message: format!("{err}")
-                    },
-                    obj_span
-                )));
+                return Some(Err(err));
             };
             let Some(tile) = parsed else {
                 return Some(Ok(None));
@@ -236,7 +231,10 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
             Some(Ok(Some((pos, tile))))
         })
     })
-        .filter(|res| res.as_ref().is_ok_and(Option::is_some))
+        .filter(|res| {
+            let res = res.as_ref();
+            res.is_err() || res.is_ok_and(Option::is_some)
+        })
         .map(|res| res.map(|opt| opt.expect("we filtered out the Nones earlier")))// Remove the Nones
         .collect::<Result<BTreeMap<_, _>, Error<Rule>>>()?;
 
@@ -256,7 +254,7 @@ fn parse_tile<'scene, N: Num>(
     tag: Option<TileTag>,
     name: &'scene str,
     variants: Pair<'scene, Rule>
-) -> Result<Option<RawTile<'scene>>, VariantError> {
+) -> Result<Option<RawTile<'scene>>, Error<Rule>> {
     let mut new_tile = false;
 
     let name = match name {
@@ -279,15 +277,31 @@ fn parse_tile<'scene, N: Num>(
     let mut variants = variants.into_inner().map(|variant| {
         let mut variant = variant.into_inner();
 
-        let name: &'scene str = variant.next().unwrap().as_str();
-        let arguments = variant
-            .map(|pair| pair.as_str());
+        let name_pair = variant.next().unwrap();
+        let name: &'scene str = name_pair.as_str();
+        let args: Vec<_> = variant.collect();
+        let arg_strings = args.iter().map(|p| p.as_str());
+        let mut arg_spans = args.iter().map(|p| p.as_span());
 
-        let identifier = VariantName::from_alias(name)?;
+        let Ok(identifier) = VariantName::from_alias(name) else {
+            return Err(
+                Error::new_from_span(
+                    ErrorVariant::CustomError { message: format!("variant \"{name}\" does not exist") },
+                    name_pair.as_span()
+                )
+            )
+        };
         Variant::parse(
-            identifier, arguments
-        )
-    }).collect::<Result<Vec<_>, VariantError>>()?;
+            identifier, arg_strings
+        ).map_err(|err| {
+            let VariantError::InvalidArgument(idx, err) = err else {unreachable!("invalid argument should be the only error passed back here")};
+            let span = arg_spans.nth(idx).unwrap_or(name_pair.as_span());
+            Error::new_from_span(
+                ErrorVariant::CustomError { message: format!("failed to parse variant: {err}") },
+                span
+            )
+        })
+    }).collect::<Result<Vec<_>, Error<Rule>>>()?;
     if !new_tile && variants.is_empty() && last_tile.is_some() {
         // Fill the tile's variants with the last tile's variants
         variants = last_tile.as_ref().unwrap().1.variants.clone();
