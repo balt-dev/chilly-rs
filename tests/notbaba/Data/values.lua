@@ -14,7 +14,7 @@ tileslist =
 		tile = {1, 0},
 		grid = {0, 1},
 		layer = 18,
-		tags = {"tag1","tag2"}
+		tags = {"tag1","tag2"},
 	},
 	object950 =
 	{

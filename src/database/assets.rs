@@ -123,21 +123,23 @@ impl Database {
     }
 
     /// Loads assets from `values.lua`.
-    fn load_vanilla_values(&mut self, path: PathBuf) -> Result<(), LoadError> {
+    fn load_vanilla_values(&mut self, path: impl AsRef<Path>) -> Result<(), LoadError> {
         // Read the file
+        let path = path.as_ref();
         let mut file_buf = String::new();
-        let mut f = fs::File::open(&path)?;
+        let mut f = fs::File::open(path)?;
         f.read_to_string(&mut file_buf)?;
         drop(f); // Close immediately
 
         // Find the start and end of the tiles list
         let start = file_buf.find("tileslist =\n{\n\t")
-            .ok_or(LoadError::LuaDataNotFound("tileslist", path.clone()))?;
-        let end = file_buf[start..].find("},\n}")
-            .ok_or(LoadError::LuaDataNotFound("tileslist", path.clone()))?;
+            .ok_or(LoadError::LuaDataNotFound("tileslist", path.to_path_buf()))?;
+        let len = file_buf[start..].find("\n}")
+            .ok_or(LoadError::LuaDataNotFound("tileslist", path.to_path_buf()))?;
         // Slice the string to the tiles list
-        // We add 13 to get to the end of start's pattern string
-        let tileslist_string = &file_buf[start + 15 .. end];
+        // We add 15 to get to the end of start's pattern string,
+        // and 2 to get past the end of the last object
+        let tileslist_string = &file_buf[start + 13 .. start + len];
         let tiles = regex!(r"(?s-u)(\w+) =\n\t\{\s+([[:ascii:]]+?\n)\t\},")
             .captures_iter(tileslist_string)
             .map(|c| c.extract())
@@ -198,7 +200,7 @@ impl Database {
             .map(|opt| opt.ok_or(LoadError::InvalidLua("invalid tile index")))
             .transpose()?;
         // Parse grid index, if it's there
-        let grid_index = props.get("griid")
+        let grid_index = props.get("grid")
             .map(Database::parse_lua_vec2)
             .map(|opt| opt.ok_or(LoadError::InvalidLua("invalid grid index")))
             .transpose()?;
@@ -208,7 +210,7 @@ impl Database {
             .map(u8::from_str)
             .transpose().map_err(|_| LoadError::InvalidLua("invalid layer number"))?;
         // Parse the tags, if they're there
-        let tags = props.get("tile")
+        let tags = props.get("tags")
             .map(Database::parse_lua_strings)
             .map(|opt| opt.ok_or(LoadError::InvalidLua("invalid tag list")))
             .transpose()?
@@ -230,22 +232,23 @@ impl Database {
     }
 
     /// Loads assets from `editor_objlist.lua`.
-    fn load_vanilla_objlist(&mut self, path: PathBuf) -> Result<(), LoadError> {
+    fn load_vanilla_objlist(&mut self, path: impl AsRef<Path>) -> Result<(), LoadError> {
         // Read the file
+        let path = path.as_ref();
         let mut file_buf = String::new();
-        let mut f = fs::File::open(&path)?;
+        let mut f = fs::File::open(path)?;
         f.read_to_string(&mut file_buf)?;
         drop(f); // Close immediately
-        
+
         // Find the start and end of the tiles list
         // Offset the start by the match string's length
         let start = file_buf.find("editor_objlist = {\n\t")
-            .ok_or(LoadError::LuaDataNotFound("editor_objlist", path.clone()))? + 20;
-        let end = file_buf[start..].find(",\n}")
-            .ok_or(LoadError::LuaDataNotFound("editor_objlist", path.clone()))?;
+            .ok_or(LoadError::LuaDataNotFound("editor_objlist", path.to_path_buf()))? + 20;
+        let len = file_buf[start..].find("\n}")
+            .ok_or(LoadError::LuaDataNotFound("editor_objlist", path.to_path_buf()))?;
 
         // Slice the string to the object list
-        let objlist_string = &file_buf[start .. end];
+        let objlist_string = &file_buf[start .. start+len];
         let tiles = regex!(r"(?s)\[\d+?] = \{(.+?)\t\},")
             .captures_iter(objlist_string)
             .map(|c| c.extract())

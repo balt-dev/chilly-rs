@@ -13,6 +13,7 @@ mod hooks;
 mod type_map;
 mod structures;
 mod groups;
+mod variants;
 
 #[shuttle_runtime::main]
 async fn serenity(

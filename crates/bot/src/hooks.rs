@@ -28,7 +28,7 @@ async fn before(ctx: &Context, msg: &Message, command_name: &str) -> bool {
 
 /// Sets up the given framework for the bot.
 pub fn setup_framework(config: Config, owners: HashSet<UserId>) -> StandardFramework {
-    let mut framework = StandardFramework::new()
+    let framework = StandardFramework::new()
         .after(after)
         .before(before)
         .group(&groups::general::GENERAL_GROUP);

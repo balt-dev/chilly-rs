@@ -1,26 +1,30 @@
 scene = _{SOI ~ flags ~ tilemap ~ EOI}
 
 flags = {(flag ~ ws+)* ~ flag?}
-flag = {"-" ~ "-"? ~ flag_name ~ ("=" ~ flag_arg)?}
+flag = {"-" ~ "-"? ~ flag_name ~ (!"\\" ~ "=" ~ flag_arg)?}
 
-tilemap = {((row ~ "\n")* ~ row)?}
-row = {((stack ~ " "+)* ~ stack)?}
-stack = {((anim ~ "&")* ~ anim)?}
-anim = {((cell ~ ">")* ~ cell)?}
+tilemap = {((row ~ (!"\\" ~ "\n"))* ~ row)?}
+row = {((stack ~ (!"\\" ~ " ")+)* ~ stack)?}
+stack = {((anim ~ (!"\\" ~ "&"))* ~ anim)?}
+anim = {((cell ~ (!"\\" ~ ">"))* ~ cell)?}
 cell = {(object ~ variants)?}
 
 object = _{tile}
 
-tile = {value}
+tile = {tag ~ tile_name}
+tag = {text | glyph | ""}
+text = {"$"}
+glyph = {"#"}
 
-variants = {(":" ~ variant)*}
-variant = {var_name ~ ("/" ~ vallist)?}
-vallist = _{var_arg ~ ("/" ~ var_arg)*}
+variants = {((!"\\" ~ ":") ~ variant)*}
+variant = {var_name ~ ((!"\\" ~ "/") ~ vallist)?}
+vallist = _{var_arg ~ ((!"\\" ~ "/") ~ var_arg)*}
 
 flag_name = {value}
 flag_arg = {value}
 var_name = {value}
 var_arg = {value}
+tile_name = {value}
 value = _{(("\\" | !blacklist) ~ ANY)*}
 
 blacklist = _{ws | "&" | ">" | "=" | ":" | "/"}

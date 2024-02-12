@@ -2,10 +2,11 @@
 
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Mul};
 use num_traits::Num;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Default)]
 #[allow(missing_docs)]
 /// A four-dimensional position of an object in a scene.
 pub struct Position<N: Num> {
@@ -15,12 +16,30 @@ pub struct Position<N: Num> {
     pub t: N
 }
 
+impl<N: Debug + Num> Debug for Position<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f, "Position {{ x: {:?}, y: {:?}, z: {:?}, t: {:?} }}",
+            self.x, self.y, self.z, self.t
+        )
+    }
+}
+
+impl<N: Display + Num> Display for Position<N> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f, "{{ {}, {}, {}, {} }}",
+            self.x, self.y, self.z, self.t
+        )
+    }
+}
+
 impl<N> Position<N> where N: Num {
     /// Converts this position into another numeric representation.
     ///
     /// # Notes
     /// This cannot be a basic From implementation, as From can't blanket all types.
-    fn into<O: From<N> + Num>(self) -> Position<O> {
+    pub fn into<O: From<N> + Num>(self) -> Position<O> {
         Position {
             x: self.x.into(),
             y: self.y.into(),

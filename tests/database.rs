@@ -1,37 +1,33 @@
-use std::{collections::{BTreeSet, HashMap}, path::PathBuf};
+#![cfg(feature = "assets")]
+
+use std::{
+    collections::{BTreeSet, BTreeMap},
+    path::PathBuf
+};
+use std::collections::HashMap;
 
 use chilly::database::{
     structures::{Color, TileData, Tiling},
     Database
 };
 
-#[cfg(feature = "assets")]
 use std::process::ExitCode;
 
-#[cfg(feature = "assets")]
 #[test]
 // Do this so the error message prints pretty
 fn main() -> ExitCode {
     match _main() {
-        Ok(_) => return ExitCode::SUCCESS,
+        Ok(_) => ExitCode::SUCCESS,
         Err(e) => {
             // Print the Display representation of the error
             eprintln!("{e}");
-            return ExitCode::FAILURE;
+            ExitCode::FAILURE
         }
     }
 }
 
-#[cfg(feature = "assets")]
 fn _main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut database = Database::new();
-    // Get testing assets directory
-    let testing_path = PathBuf::from(file!());
-    let custom_assets = testing_path.with_file_name("assets");
-    let vanilla_assets = testing_path.with_file_name("notbaba");
-    database.load_custom(custom_assets)?;
-    database.load_vanilla(vanilla_assets)?;
-    assert_eq!(database, Database {
+    let sample_db = Database {
         tiles: HashMap::from([
             ("foo".into(), TileData {
                 color: Color::Paletted { x: 0, y: 3 },
@@ -61,7 +57,7 @@ fn _main() -> Result<(), Box<dyn std::error::Error>> {
                 ..Default::default()
             }),
             ("sample".into(), TileData {
-                color: Color::Paletted { x: 2, y: 2 },
+                color: Color::Paletted { x: 2, y: 4 },
                 sprite: "sample".into(),
                 directory: "vanilla".into(),
                 tiling: Tiling::Character,
@@ -95,7 +91,16 @@ fn _main() -> Result<(), Box<dyn std::error::Error>> {
                 ..Default::default()
             })
         ])
-    });
+    };
+
+    let mut database = Database::new();
+    // Get testing assets directory
+    let testing_path = PathBuf::from(file!());
+    let custom_assets = testing_path.with_file_name("assets");
+    let vanilla_assets = testing_path.with_file_name("notbaba");
+    database.load_custom(custom_assets)?;
+    database.load_vanilla(vanilla_assets)?;
+    assert_eq!(database, sample_db);
 
     Ok(())
 }

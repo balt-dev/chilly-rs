@@ -1,6 +1,7 @@
 //! Handles tilemap parsing.
 // This is put inside a bot for organization with the pest grammar file.
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, HashMap};
 use itertools::Itertools;
 use num_traits::Num;
@@ -43,32 +44,38 @@ mod scene {
                 Rule::var_name => "a name for a variant",
                 Rule::var_arg => "a list of arguments for a variant",
                 Rule::value | Rule::blacklist | Rule::ws => "<internal token>",
+                Rule::text | Rule::glyph | Rule::tag => "a tile prefix",
+                Rule::tile_name => "a tile name",
                 Rule::EOI => "the end of the input"
             })
         }
     }
 }
 use scene::Rule;
+use crate::variants::{Variant, VariantError, VariantName};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+/// A tag for a tile.
+#[non_exhaustive]
+pub enum TileTag {
+    /// Prepends `text_` to a tile's name, or removes it if in text mode alredy.
+    Text,
+    /// Prepends `glyph_` to a tile's name.
+    Glyph
+}
+
+#[derive(Debug, Clone, PartialEq)]
 /// An unparsed tile.
-pub struct RawTile {
+pub struct RawTile<'scene> {
     /// The tile's name.
-    pub name: String,
+    pub name: &'scene str,
+    /// The tag the tile may have.
+    pub tag: Option<TileTag>,
     /// The tile's variants.
-    pub variants: Vec<RawVariant>
+    pub variants: Vec<Variant>
 }
 
-impl Object for RawTile {}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-/// An unparsed variant.
-pub struct RawVariant {
-    /// The variant's name.
-    pub name: String,
-    /// The variant's arguments.
-    pub arguments: Vec<String>
-}
+impl<'s> Object for RawTile<'s> {}
 
 /// Formats a pest error for better readability.
 fn handle_error(error: Error<Rule>) -> Error<Rule> {
@@ -114,6 +121,22 @@ fn handle_error(error: Error<Rule>) -> Error<Rule> {
     formatted_error
 }
 
+// Helper function to unescape a string
+fn unescape(string: &str) -> Cow<str> {
+    let fixed = string
+        .replace(r"\\", "\x00") //Intermediary
+        .replace(r"\n", "\n")
+        .replace(r"\r", "\r")
+        .replace(r"\t", "\t")
+        .replace('\\', "")
+        .replace('\x00', r"\"); // Fix intermediary
+    if fixed == string {
+        Cow::Borrowed(string)
+    } else {
+        Cow::Owned(fixed)
+    }
+}
+
 /// Parses a scene.
 ///
 /// # Errors
@@ -133,11 +156,12 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
             let mut parts = flag.into_inner();
             // .is_empty() for iterators hasn't been stabilized yet
             if parts.len() == 0 { return None; }
-            let name = parts.next().unwrap()
-                .as_str().to_string();
+            // TODO: These could be Cow<str>
+            let name = unescape(parts.next().unwrap().as_str()).into_owned();
             let value = parts.next()
-                .map(|pair| pair.as_str())
-                .map(str::to_string);
+                .map(|pair|
+                     pair.as_str().to_string()
+                );
             Some((name, value))
         }).collect::<HashMap<_, _>>();
     // Iterator over iterators over (Position, Pair<Rule>)
@@ -163,7 +187,6 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
             }
         );
     let tiles = tilemap_iter.flat_map(|iter| {
-        let iter_len = iter.len();
         let nonstop_iter = iter.map(Some).pad_using(length, |_| None);
         // We currently have an iterator over every tile in this animation cell
         nonstop_iter.scan(None, |last_tile: &mut Option<(Position<usize>, RawTile)>, maybe_tile| {
@@ -175,28 +198,47 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
                     pos.t += 1; // Increment the frame counter so it's not on the same frame
                 }
                 *last_tile = last.clone();
-                return Some(last)
+                return Some(Ok(last))
             }
             let (pos, current_obj) = maybe_tile.unwrap();
             let mut pairs = current_obj.into_inner();
             let object = pairs.next().unwrap();
+            let obj_span = object.as_span();
             let variants = pairs.next().unwrap();
             // Check what this object actually is
             if object.as_rule() != Rule::tile {
                 todo!("Object type not implemented: {}", object.as_rule())
             }
-            let name = object.as_str();
+            let mut parts = object.into_inner();
+            let mut tag = parts.next().unwrap().into_inner();
+            let tag = tag.next().map(|pair| match pair.as_rule() {
+                Rule::text => TileTag::Text,
+                Rule::glyph => TileTag::Glyph,
+                _ => unreachable!()
+            });
+            let name = parts.next().unwrap().as_str();
 
             // Parse the tile
-            let Some(tile) = parse_tile(last_tile, name, variants) else {
-                return Some(None);
+            let parsed = parse_tile(last_tile, tag, name, variants);
+            let Ok(parsed) = parsed else {
+                let err = parsed.unwrap_err();
+                return Some(Err(Error::new_from_span(
+                    ErrorVariant::CustomError {
+                        message: format!("{err}")
+                    },
+                    obj_span
+                )));
+            };
+            let Some(tile) = parsed else {
+                return Some(Ok(None));
             };
             *last_tile = Some((pos, tile.clone()));
-            Some(Some((pos, tile)))
+            Some(Ok(Some((pos, tile))))
         })
     })
-        .flatten() // Remove the Nones
-        .collect::<BTreeMap<_, _>>();
+        .filter(|res| res.as_ref().is_ok_and(Option::is_some))
+        .map(|res| res.map(|opt| opt.expect("we filtered out the Nones earlier")))// Remove the Nones
+        .collect::<Result<BTreeMap<_, _>, Error<Rule>>>()?;
 
     Ok(Scene {
         map: ObjectMap {
@@ -209,26 +251,27 @@ pub fn parse(scene: &str) -> Result<Scene<RawTile, usize>, Error<Rule>> {
     })
 }
 
-fn parse_tile<N: Num>(
-    last_tile: &mut Option<(Position<N>, RawTile)>,
-    name: &str,
-    variants: Pair<Rule>
-) -> Option<RawTile> {
+fn parse_tile<'scene, N: Num>(
+    last_tile: &mut Option<(Position<N>, RawTile<'scene>)>,
+    tag: Option<TileTag>,
+    name: &'scene str,
+    variants: Pair<'scene, Rule>
+) -> Result<Option<RawTile<'scene>>, VariantError> {
     let mut new_tile = false;
 
     let name = match name {
         // Implicitly empty, fill with last tile
-        "" if last_tile.is_some() => last_tile.as_ref().unwrap()
-            .1.name.to_string(),
+        "" if last_tile.is_some() =>
+            last_tile.as_ref().unwrap().1.name,
         // Explicitly empty, clear last and return Some(None)
         "." | "" => {
             *last_tile = None;
-            return None;
+            return Ok(None);
         },
         name => {
             // This is explicitly something new
             new_tile = true;
-            name.to_string()
+            name
         }
     };
 
@@ -236,17 +279,19 @@ fn parse_tile<N: Num>(
     let mut variants = variants.into_inner().map(|variant| {
         let mut variant = variant.into_inner();
 
-        let name = variant.next().unwrap().as_str().to_string();
+        let name: &'scene str = variant.next().unwrap().as_str();
         let arguments = variant
-            .map(|pair| pair.as_str().to_string())
-            .collect::<Vec<_>>();
+            .map(|pair| pair.as_str());
 
-        RawVariant { name, arguments }
-    }).collect::<Vec<_>>();
+        let identifier = VariantName::from_alias(name)?;
+        Variant::parse(
+            identifier, arguments
+        )
+    }).collect::<Result<Vec<_>, VariantError>>()?;
     if !new_tile && variants.is_empty() && last_tile.is_some() {
         // Fill the tile's variants with the last tile's variants
         variants = last_tile.as_ref().unwrap().1.variants.clone();
     }
 
-    Some(RawTile {name, variants})
+    Ok(Some(RawTile::<'scene> {name, tag, variants}))
 }
