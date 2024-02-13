@@ -1,8 +1,8 @@
-use std::collections::HashSet;
+use std::collections::HashMap;
 use pest::Span;
 
 use crate::{
-    arguments::{Flag, Variant},
+    arguments::{Flag, FlagName, Variant},
     structures::{Object, ObjectMap}
 };
 
@@ -13,7 +13,7 @@ pub struct RawScene<'scene> {
     /// A tilemap of the objects in the scene.
     pub map: ObjectMap<RawTile<'scene>, usize>,
     /// The attached flags of the scene.
-    pub flags: HashSet<Flag>
+    pub flags: HashMap<FlagName, Flag>
 }
 
 

@@ -1,7 +1,7 @@
 scene = _{SOI ~ flags ~ tilemap ~ EOI}
 
 flags = {(flag ~ ws+)* ~ flag?}
-flag = {"-" ~ "-"? ~ flag_name ~ (!"\\" ~ "=" ~ flag_arg)?}
+flag = {"-" ~ "-"? ~ flag_name ~ (!"\\" ~ "=" ~ vallist)?}
 
 tilemap = {((row ~ (!"\\" ~ "\n"))* ~ row)?}
 row = {((stack ~ (!"\\" ~ " ")+)* ~ stack)?}

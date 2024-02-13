@@ -44,9 +44,20 @@ macro_rules! flags {
             }
         }
 
+        impl FlagName {
+            /// Transforms a flag's alias into its canonical name, if there exists a flag with the argument as its alias.
+            #[must_use]
+            pub fn from_alias(alias: &str) -> Option<FlagName> {
+                Some( match alias {
+                    $($($alias)|+ => FlagName::$name,)+
+                    _ => return None
+                } )
+            }
+        }
+
         /// Holds an enumeration over every flag supported by Chilly.
         #[non_exhaustive]
-        #[derive(Debug, PartialEq, Clone)]
+        #[derive(Debug, PartialEq, Eq, Hash, Clone)]
         pub enum Flag {
             $(
                 #[doc = $description]
@@ -107,5 +118,18 @@ flags! {
         ["b", "background"],
         "Sets the background color of this scene.",
         [Color]
+    },
+    {
+        ConnectBorders,
+        ["tb", "tile_borders"],
+        "Connects any autotiling tiles to the borders of the scene.",
+        []
+    },
+    {
+        UseLetters,
+        ["letters", "let"],
+        "Defaults to using letters for text generation.",
+        []
     }
 }
+

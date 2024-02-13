@@ -6,16 +6,11 @@ use pest::Span;
 use rand::seq::SliceRandom;
 
 use crate::{
-    database::{
-        Database,
-        structures::{TileData, Tiling}
-    },
-    parser::{RawScene, TileTag},
-    structures::{Object, ObjectMap, Position},
     arguments::{
-        Variant,
-        TilingDirection
-    }
+        Flag, FlagName, TilingDirection, Variant
+    }, database::{
+        structures::{TileData, Tiling}, Database
+    }, parser::{RawScene, TileTag}, structures::{Object, ObjectMap, Position}
 };
 
 /// The mode to default a tile to in a scene.
@@ -82,12 +77,10 @@ impl<'scene> RawScene<'scene> {
     #[allow(clippy::too_many_lines)]
     pub fn solidify<'db>(self, db: &'db Database, default: &TileDefault, easter_egg_tiles: &HashSet<String>) -> SkeletalScene<'db, 'scene> {
         let mut flags = self.flags;
-        let connect_corners = flags.contains_key("tb") || flags.contains_key("tile_borders");
-        let default_to_letters = flags.contains_key("letter");
-        // Remove flags we aren't using anymore
-        flags.remove("tb");
-        flags.remove("tile_borders");
-        flags.remove("letter");
+        // Detect flags
+        let connect_corners = flags.remove(&FlagName::ConnectBorders).is_some();
+        let default_to_letters = flags.remove(&FlagName::UseLetters).is_some();
+        // Parse scene
         let mut scene = SkeletalScene {
             letters: default_to_letters,
             flags,
@@ -250,7 +243,7 @@ pub struct SkeletalScene<'db, 'scene> {
     /// Whether any generated text objects default to letters.
     pub letters: bool,
     /// The attached flags of the scene.
-    pub flags: HashMap<String, Option<String>>
+    pub flags: HashMap<FlagName, Flag>
 }
 
 

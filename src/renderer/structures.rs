@@ -1,8 +1,13 @@
-use std::{error::Error, fmt::{Display, Formatter}, io};
+use std::{
+    fmt::{Display, Formatter},
+    io,
+    collections::HashMap
+};
 
 use image::Rgba;
 use pest::{error::ErrorVariant, Span};
 use thiserror::Error;
+use crate::arguments::{FlagName, Flag};
 
 
 /// A rendered scene, ready to be passed back to the renderer implementation.
@@ -10,7 +15,8 @@ use thiserror::Error;
 pub struct RenderedScene {
     /// The background color of the scene.
     pub background: Rgba<u8>,
-    
+    /// The flags to pass back to the implementation.
+    pub flags: HashMap<FlagName, Flag>
 }
 
 #[derive(Debug, Error)]

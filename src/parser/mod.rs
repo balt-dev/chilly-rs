@@ -10,7 +10,7 @@ pub use structures::{
 
 use std::{
     borrow::Cow,
-    collections::HashMap
+    collections::{HashMap, HashSet}
 };
 use itertools::Itertools;
 use num_traits::Num;
@@ -19,10 +19,9 @@ use pest::{
     iterators::Pair,
     Parser
 };
-use crate::structures::{
-    Position,
-    ObjectMap
-};
+use crate::{arguments::{Flag, FlagName}, structures::{
+    ObjectMap, Position
+}};
 
 mod scene {
     #![allow(missing_docs)]
@@ -136,20 +135,39 @@ pub fn parse(scene: &str) -> Result<RawScene, Error<Rule>> {
     let Ok(mut raw_scene) = maybe_raw_scene else {
         return Err(handle_error(maybe_raw_scene.unwrap_err()));
     };
-    let flags = raw_scene.next().unwrap().into_inner()
+    let flags: HashMap<FlagName, Flag> = raw_scene.next().unwrap().into_inner()
         .filter_map(|flag| {
             // Parse an individual flag
             let mut parts = flag.into_inner();
             // .is_empty() for iterators hasn't been stabilized yet
             if parts.len() == 0 { return None; }
             // TODO: These could be Cow<str>
-            let name = unescape(parts.next().unwrap().as_str()).into_owned();
-            let value = parts.next()
-                .map(|pair|
-                     pair.as_str().to_string()
-                );
-            Some((name, value))
-        }).collect::<HashMap<_, _>>();
+            // Parse the name and arguments of the flag
+            let name_pair = parts.next().unwrap();
+            let name = name_pair.as_str();
+            let args: Vec<_> = parts.collect();
+            let arg_strings = args.iter().map(Pair::as_str);
+            let mut arg_spans = args.iter().map(Pair::as_span);
+            // Parse the name
+            let identifier = FlagName::from_alias(name).ok_or_else(||
+                Error::new_from_span(
+                    ErrorVariant::CustomError { message: format!("flag \"{name}\" does not exist") },
+                    name_pair.as_span()
+                )
+            );
+            let Ok(identifier) = identifier else {return Some(Err(identifier.unwrap_err()))};
+            let flag = Flag::parse(identifier, arg_strings).map_err(|err| {
+                let ArgumentError::InvalidArgument("flag", idx, err) = err 
+                    else {unreachable!("invalid flag should be the only error passed back here")};
+                let span = arg_spans.nth(idx).unwrap_or(name_pair.as_span());
+                Error::new_from_span(
+                    ErrorVariant::CustomError { message: format!("failed to parse flag: {err}") },
+                    span
+                )
+            });
+            let Ok(flag) = flag else {return Some(Err(flag.unwrap_err()))};
+            Some(Ok((identifier, flag)))
+        }).collect::<Result<_, _>>()?;
     // Iterator over iterators over (Position, Pair<Rule>)
     let tilemap_iter = raw_scene.next().unwrap()
         .into_inner().enumerate().flat_map(|(y, row)|

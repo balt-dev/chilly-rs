@@ -3,16 +3,9 @@
 
 use std::{
     borrow::Cow, 
-    collections::HashMap, 
-    fmt::{Display, Formatter}, 
-    fs::File, 
+    collections::HashMap,
     path::{Path, PathBuf},
-    io
 };
-use pest::{
-    error::ErrorVariant, Span
-};
-use thiserror::Error;
 use crate::solidify::SkeletalScene;
 use image::{io::Reader as ImageReader, Rgba, RgbaImage};
 
@@ -59,9 +52,7 @@ impl<'db, 'scene> SkeletalScene<'db, 'scene> {
     ) -> Result<RenderedScene, RenderingError<'scene>> {
         // Parse the flags if they're there
         let mut background = Rgba::from([0u8; 4]);
-        if let Some(flag) = self.flags.remove("b")
-            .or(self.flags.remove("background")) 
-        {
+        if let Some(flag) = self.flags {
             
         }
     }
