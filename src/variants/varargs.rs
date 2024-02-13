@@ -2,15 +2,21 @@
 
 use std::str::FromStr;
 use anyhow::anyhow;
+use crate::database::structures::Color;
 
 mod sealed {
-    use crate::varargs::MetaKernel;
+    use crate::database::structures::Color;
+    use super::{MetaKernel, TilingDirection};
 
     pub trait Sealed {}
     impl Sealed for MetaKernel {}
+    impl Sealed for TilingDirection {}
     impl Sealed for u8 {}
     impl Sealed for f32 {}
+    impl Sealed for Color {}
     impl<T: Sealed> Sealed for Option<T> {}
+    impl<T: Sealed> Sealed for Vec<T> {}
+    impl<const N: usize, T: Sealed> Sealed for [T; N] {}
 }
 
 type BoxedErr = Box<dyn std::error::Error>;
@@ -24,7 +30,10 @@ type BoxedErr = Box<dyn std::error::Error>;
 pub trait VariantArgument: sealed::Sealed + Sized {
     /// Parses values from the iterator until this type can be constructed.
     ///
-    /// Returns None if failed.
+    /// # Errors
+    /// Returns a [`Box<dyn std::error::Error>`] when an argument fails to parse.
+    ///
+    /// A type can fail to parse for any number of reasons, so the error is left generic.
     fn parse<'a>(args: impl Iterator<Item = &'a str>) -> Result<Self, BoxedErr>;
 }
 
@@ -69,6 +78,28 @@ impl<T: VariantArgument + sealed::Sealed> VariantArgument for Option<T> {
     }
 }
 
+impl<T: VariantArgument + sealed::Sealed> VariantArgument for Vec<T> {
+    fn parse<'a>(args: impl Iterator<Item=&'a str>) -> Result<Self, BoxedErr> {
+        args.map(
+            |arg| T::parse([arg].into_iter())
+        ).collect()
+    }
+}
+
+impl<const N: usize, T: VariantArgument + sealed::Sealed> VariantArgument for [T; N] {
+    fn parse<'a>(args: impl Iterator<Item=&'a str>) -> Result<Self, BoxedErr> {
+        // TODO: When https://github.com/rust-lang/rust/issues/89379 is stabilized, this can be optimized
+        let args = args.take(N).map(
+            |arg| T::parse([arg].into_iter())
+        ).collect::<Result<Vec<_>, _>>()?;
+        let len = args.len();
+        let args: [T; N] = args.try_into().map_err(
+            |_| anyhow!("wrong amount of arguments for array of size {N} (got {len})")
+        )?;
+        Ok(args)
+    }
+}
+
 /// A kernel to use for the [`Variant::Meta`] effect.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
 pub enum MetaKernel {
@@ -82,6 +113,13 @@ pub enum MetaKernel {
     Unit
 }
 
+/// A tiling direction for a tile to connect to. Used in [`Variant::Tiling`].
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[allow(missing_docs)]
+pub enum TilingDirection {
+    Right, UpRight, Up, UpLeft, Left, DownLeft, Down, DownRight
+}
+
 arg_unit_enum!{
     MetaKernel:
         "full" => Full,
@@ -89,6 +127,18 @@ arg_unit_enum!{
         "unit" => Unit
 }
 
+arg_unit_enum!{
+    TilingDirection:
+        "r" => Right,
+        "u" => Up,
+        "l" => Left,
+        "d" => Down,
+        "ur" => UpRight,
+        "ul" => UpLeft,
+        "dl" => DownLeft,
+        "dr" => DownRight
+}
+
 arg_from_str! {
-    u8 f32
+    u8 f32 Color
 }

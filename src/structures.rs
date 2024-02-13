@@ -1,7 +1,7 @@
 //! Holds a few data structures for general use.
 
 use std::cmp::Ordering;
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fmt::{Debug, Display, Formatter};
 use std::ops::{Add, Mul};
 use num_traits::Num;
@@ -91,7 +91,7 @@ pub struct ObjectMap<O: Object, N: Num> {
     /// The time length of the map.
     pub length: usize,
     /// A map of positions to objects.
-    pub objects: BTreeMap<Position<N>, O>
+    pub objects: HashMap<Position<N>, O>
 }
 
 impl<N: Num, O: Object> Default for ObjectMap<O, N> {
@@ -100,7 +100,7 @@ impl<N: Num, O: Object> Default for ObjectMap<O, N> {
             width: 0,
             height: 0,
             length: 0,
-            objects: BTreeMap::new()
+            objects: HashMap::new()
         }
     }
 }

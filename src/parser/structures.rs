@@ -1,6 +1,10 @@
 use std::collections::HashMap;
+use pest::Span;
 
-use crate::{structures::{Object, ObjectMap}, variants::Variant};
+use crate::{
+    structures::{Object, ObjectMap},
+    variants::Variant
+};
 
 
 /// A raw scene, before any parsing efforts.
@@ -21,7 +25,9 @@ pub struct RawTile<'scene> {
     /// The tag the tile may have.
     pub tag: Option<TileTag>,
     /// The tile's variants.
-    pub variants: Vec<Variant>
+    pub variants: Vec<Variant>,
+    /// The span of the tile's name. Used for error reporting.
+    pub(crate) span: Span<'scene>
 }
 
 impl<'s> Object for RawTile<'s> {}

@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 
 pub mod structures;
-mod constants;
 mod assets;
 
 /// Chilly's internal database.
@@ -16,7 +15,7 @@ mod assets;
 /// # Notes
 /// This is expected to be a VERY large value, so cloning a filled database is unwise.
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-#[derive(Debug, PartialEq, Eq, Default, Clone)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub struct Database {
     /// A mapping of tile names to their data.
     pub tiles: HashMap<String, TileData>

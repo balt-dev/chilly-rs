@@ -5,6 +5,7 @@ use core::{
     str::FromStr
 };
 use std::collections::BTreeSet;
+use std::num::ParseIntError;
 use displaydoc::Display;
 
 #[cfg(feature = "serde")]
@@ -16,6 +17,7 @@ use serde::{
 };
 #[cfg(feature = "serde")]
 use serde_repr::{Serialize_repr, Deserialize_repr};
+use thiserror::Error;
 
 #[repr(i8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
@@ -92,7 +94,7 @@ impl Display for Color {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Display)]
+#[derive(Debug, Clone, PartialEq, Eq, Display, Error)]
 /// Something went wrong wile parsing a color.
 pub enum ColorError {
     /// RGB color string must be exactly 7 characters long
@@ -101,7 +103,15 @@ pub enum ColorError {
     NotHex,
     #[displaydoc("{0} is not a valid color name")]
     /// This is not a valid color name
-    InvalidName(String)
+    InvalidName(String),
+    /// Invalid digit for palette
+    InvalidDigit
+}
+
+impl From<ParseIntError> for ColorError {
+    fn from(_: ParseIntError) -> Self {
+        Self::InvalidDigit
+    }
 }
 
 impl FromStr for Color {
@@ -120,6 +130,11 @@ impl FromStr for Color {
             )?;
             let [r, g, b, _] = rgb.to_be_bytes();
             return Ok(Color::RGB { r, g, b });
+        }
+        // Check for comma-separated palette
+        if let Some((x, y)) = v.split_once(',') {
+            let (x, y): (u8, u8) = (x.parse()?, y.parse()?);
+            return Ok(Color::Paletted { x, y });
         }
         // Find colors by name
         Ok( match v {

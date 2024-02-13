@@ -14,7 +14,7 @@ TODO:
 
 - [x] Parsing
 - [x] Variant data
-- [ ] Renderer (should give back individual tiles as a `Scene`)
+- [ ] Renderer (should give back individual sprites as a `Scene`)
 - [ ] Bot wrapping
 
 https://github.com/balt-dev/chilly

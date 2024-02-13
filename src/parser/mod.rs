@@ -8,8 +8,10 @@ pub use structures::{
     RawTile
 };
 
-use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    borrow::Cow,
+    collections::HashMap
+};
 use itertools::Itertools;
 use num_traits::Num;
 use pest::{
@@ -58,7 +60,7 @@ mod scene {
         }
     }
 }
-use scene::Rule;
+pub(crate) use scene::Rule;
 use crate::variants::{Variant, VariantError, VariantName};
 
 /// Formats a pest error for better readability.
@@ -126,7 +128,7 @@ fn unescape(string: &str) -> Cow<str> {
 /// # Errors
 /// Errors if the scene fails to parse.
 #[allow(clippy::result_large_err, clippy::missing_panics_doc)]
-pub fn parse<'a>(scene: &'a str) -> Result<RawScene<'a>, Error<Rule>> {
+pub fn parse(scene: &str) -> Result<RawScene, Error<Rule>> {
     // I'll be perfectly honest here.
     // Using pest here is overkill.
     // But, I like using it, so I'm using it.
@@ -199,10 +201,10 @@ pub fn parse<'a>(scene: &'a str) -> Result<RawScene<'a>, Error<Rule>> {
                 Rule::glyph => TileTag::Glyph,
                 _ => unreachable!()
             });
-            let name = parts.next().unwrap().as_str();
+            let name = parts.next().unwrap();
 
             // Parse the tile
-            let parsed = parse_tile(last_tile, tag, name, variants);
+            let parsed = parse_tile(last_tile, tag, &name, variants);
             let Ok(parsed) = parsed else {
                 let err = parsed.unwrap_err();
                 return Some(Err(err));
@@ -219,7 +221,7 @@ pub fn parse<'a>(scene: &'a str) -> Result<RawScene<'a>, Error<Rule>> {
             res.is_err() || res.is_ok_and(Option::is_some)
         })
         .map(|res| res.map(|opt| opt.expect("we filtered out the Nones earlier")))// Remove the Nones
-        .collect::<Result<BTreeMap<_, _>, Error<Rule>>>()?;
+        .collect::<Result<_, Error<Rule>>>()?;
 
     Ok(RawScene {
         map: ObjectMap {
@@ -232,15 +234,16 @@ pub fn parse<'a>(scene: &'a str) -> Result<RawScene<'a>, Error<Rule>> {
     })
 }
 
+#[allow(clippy::result_large_err)]
 fn parse_tile<'scene, N: Num>(
     last_tile: &mut Option<(Position<N>, RawTile<'scene>)>,
     tag: Option<TileTag>,
-    name: &'scene str,
+    name: &Pair<'scene, Rule>,
     variants: Pair<'scene, Rule>
 ) -> Result<Option<RawTile<'scene>>, Error<Rule>> {
     let mut new_tile = false;
 
-    let name = match name {
+    let name_string = match name.as_str() {
         // Implicitly empty, fill with last tile
         "" if last_tile.is_some() =>
             last_tile.as_ref().unwrap().1.name,
@@ -263,32 +266,36 @@ fn parse_tile<'scene, N: Num>(
         let name_pair = variant.next().unwrap();
         let name: &'scene str = name_pair.as_str();
         let args: Vec<_> = variant.collect();
-        let arg_strings = args.iter().map(|p| p.as_str());
-        let mut arg_spans = args.iter().map(|p| p.as_span());
+        let arg_strings = args.iter().map(Pair::as_str);
+        let mut arg_spans = args.iter().map(Pair::as_span);
 
-        let Ok(identifier) = VariantName::from_alias(name) else {
-            return Err(
+        if let Some(var) = Variant::collapse_alias(name) {
+            Ok(var)
+        } else {
+            let identifier = VariantName::from_alias(name).ok_or_else(||
                 Error::new_from_span(
                     ErrorVariant::CustomError { message: format!("variant \"{name}\" does not exist") },
                     name_pair.as_span()
                 )
-            )
-        };
-        Variant::parse(
-            identifier, arg_strings
-        ).map_err(|err| {
-            let VariantError::InvalidArgument(idx, err) = err else {unreachable!("invalid argument should be the only error passed back here")};
-            let span = arg_spans.nth(idx).unwrap_or(name_pair.as_span());
-            Error::new_from_span(
-                ErrorVariant::CustomError { message: format!("failed to parse variant: {err}") },
-                span
-            )
-        })
+            )?;
+            Variant::parse(
+                identifier, arg_strings
+            ).map_err(|err| {
+                let VariantError::InvalidArgument(idx, err) = err else {unreachable!("invalid argument should be the only error passed back here")};
+                let span = arg_spans.nth(idx).unwrap_or(name_pair.as_span());
+                Error::new_from_span(
+                    ErrorVariant::CustomError { message: format!("failed to parse variant: {err}") },
+                    span
+                )
+            })
+        }
+
+
     }).collect::<Result<Vec<_>, Error<Rule>>>()?;
     if !new_tile && variants.is_empty() && last_tile.is_some() {
         // Fill the tile's variants with the last tile's variants
         variants = last_tile.as_ref().unwrap().1.variants.clone();
     }
 
-    Ok(Some(RawTile::<'scene> {name, tag, variants}))
+    Ok(Some(RawTile::<'scene> {name: name_string, tag, variants, span: name.as_span()}))
 }

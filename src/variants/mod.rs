@@ -4,10 +4,14 @@ use std::fmt::Formatter;
 use displaydoc::Display;
 use paste::paste;
 use thiserror::Error;
-use crate::varargs::{
+mod varargs;
+pub use varargs::{
     MetaKernel,
     VariantArgument,
+    TilingDirection
 };
+use crate::database::structures::Color;
+use std::str::FromStr;
 
 /// Something went wrong while parsing a variant.
 #[derive(Debug, Error, Display)]
@@ -27,12 +31,17 @@ pub enum VariantError {
 macro_rules! variants {
     // Main implementation
     (
-        $({
+        variants = [$({
             $name: ident,
             [ $($alias: literal),+ ],
             $description: literal,
             [ $($argument: ty),* ]
-        }),*
+        }),*],
+        aliases = [$(
+            $alias_name: ident : {
+                $(($($aliased_value: tt)+) => $aliased_exp: expr),+
+            }
+        ),*]
     ) => {
         /// Holds runtime-accessible data about every variant supported by Chilly.
         pub static VARIANT_DATA: [VariantData; variants!(count $($name)*)] = [
@@ -55,15 +64,12 @@ macro_rules! variants {
         }
 
         impl VariantName {
-            /// Transforms a variant's alias into its canonical name.
-            ///
-            /// # Errors
-            /// Errors with [`VariantError::NonExistentVariant`] if no variant with this alias exists.
+            /// Transforms a variant's alias into its canonical name, if there exists a variant with the argument as its alias.
             #[must_use]
-            pub fn from_alias(alias: &str) -> Result<VariantName, VariantError> {
-                Ok( match alias {
+            pub fn from_alias(alias: &str) -> Option<VariantName> {
+                Some( match alias {
                     $($($alias)|+ => VariantName::$name,)+
-                    _ => return Err(VariantError::NonExistentVariant(alias.to_string()))
+                    _ => return None
                 } )
             }
         }
@@ -101,6 +107,18 @@ macro_rules! variants {
                     ),+
                 } )
             }
+
+            /// Collapses an aliased variant name directly into a variant, if it corresponds to one.
+            #[must_use]
+            #[allow(clippy::missing_panics_doc)]
+            pub fn collapse_alias(alias: &str) -> Option<Variant> {
+                Some ( match alias {
+                    $($(
+                        $($aliased_value)+ => $aliased_exp
+                    ),+),+ ,
+                    _ => return None
+                } )
+            }
         }
     };
     // Hold a counter of tokens for help with the VARIANT_DATA slice
@@ -132,41 +150,98 @@ macro_rules! variants {
     }
 }
 
-variants! {
-    {
-        Meta,
-        ["meta", "m"],
-       "Adds an outline to a tile's sprite.\n\
-        Optionally, it can be specified how many times to outline, \
-        an outline kernel to use, and an outline size.",
-        [Option<u8>, Option<MetaKernel>, Option<u8>]
-    },
-    {
-        Noop,
-        [""],
-        "Does nothing. Useful for resetting variants on animations.",
-        []
-    },
-    {
-        Argless,
-        ["test"],
-        "No argument test",
-        []
-    },
-    {
-        MandArgs,
-        ["mand"],
-        "Mandatory args",
-        [u8, Option<u8>]
-    }
-}
-
 /// Holds the data behind one variant.
 /// Should mostly be used for runtime documentation in a GUI.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VariantData {
-    name: VariantName,
-    aliases: &'static [&'static str],
-    description: &'static str,
-    arguments: &'static [&'static str]
+    /// The variant's canonical name.
+    pub name: VariantName,
+    /// A list of the variant's aliases.
+    pub aliases: &'static [&'static str],
+    /// A description of what the variant does.
+    pub description: &'static str,
+    /// A list of type sthat
+    pub arguments: &'static [&'static str]
+}
+
+variants! {
+    variants = [
+        {
+            Meta,
+            ["meta", "m"],
+           "Adds an outline to a tile's sprite.\n\
+            Optionally, it can be specified how many times to outline, \
+            an outline kernel to use, and an outline size.",
+            [Option<u8>, Option<MetaKernel>, Option<u8>]
+        },
+        {
+            Noop,
+            [""],
+            "Does nothing. Useful for resetting variants on animations.",
+            []
+        },
+        {
+            AnimationFrame,
+            ["frame", "f"],
+            "Sets the animation frame of this tile.",
+            [u8]
+        },
+        {
+            Left,
+            ["left", "l"],
+            "Makes the tile face left if it supports directions.",
+            []
+        },
+        {
+            Up,
+            ["up", "u"],
+            "Makes the tile face up if it supports directions.",
+            []
+        },
+        {
+            Down,
+            ["down", "d"],
+            "Makes the tile face down if it supports directions.",
+            []
+        },
+        {
+            Right,
+            ["right", "r"],
+            "Makes the tile face right if it supports directions.",
+            []
+        },
+        {
+            Sleep,
+            ["sleep", "s", "eepy"],
+            "Puts the tile to sleep if it's a character tile.",
+            []
+        },
+        {
+            Animation,
+            ["anim", "a"],
+            "Set the tile's animation cycle.",
+            [u8]
+        },
+        {
+            Tiling,
+            ["t", "tiling"],
+            "Sets the tiling directions of this tile.",
+            [Vec<TilingDirection>]
+        },
+        {
+            Color,
+            ["c", "color"],
+            "Sets the color of the tile.\n\
+             May be a palette index, a color name, or an RGB color.\n\
+             This variant is aliased, so specifying the variant's name is optional.",
+            [Color]
+        }
+    ],
+    aliases = [
+        Color: {
+            // There is no way to bind to a match guard, so we parse twice :(
+            (color_name if Color::from_str(color_name).is_ok()) =>
+                Variant::Color(Color::from_str(color_name).expect("we checked that this works"))
+        }
+    ]
 }
