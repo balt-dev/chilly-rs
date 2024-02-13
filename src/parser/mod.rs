@@ -61,7 +61,7 @@ mod scene {
     }
 }
 pub(crate) use scene::Rule;
-use crate::variants::{Variant, VariantError, VariantName};
+use crate::arguments::{Variant, ArgumentError, VariantName};
 
 /// Formats a pest error for better readability.
 fn handle_error(error: Error<Rule>) -> Error<Rule> {
@@ -281,7 +281,8 @@ fn parse_tile<'scene, N: Num>(
             Variant::parse(
                 identifier, arg_strings
             ).map_err(|err| {
-                let VariantError::InvalidArgument(idx, err) = err else {unreachable!("invalid argument should be the only error passed back here")};
+                let ArgumentError::InvalidArgument("variant", idx, err) = err 
+                    else {unreachable!("invalid argument should be the only error passed back here")};
                 let span = arg_spans.nth(idx).unwrap_or(name_pair.as_span());
                 Error::new_from_span(
                     ErrorVariant::CustomError { message: format!("failed to parse variant: {err}") },

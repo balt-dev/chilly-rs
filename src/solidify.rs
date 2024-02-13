@@ -12,7 +12,7 @@ use crate::{
     },
     parser::{RawScene, TileTag},
     structures::{Object, ObjectMap, Position},
-    variants::{
+    arguments::{
         Variant,
         TilingDirection
     }

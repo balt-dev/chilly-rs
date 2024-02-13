@@ -19,6 +19,12 @@ use serde::{
 use serde_repr::{Serialize_repr, Deserialize_repr};
 use thiserror::Error;
 
+#[cfg(feature = "rendering")]
+use image::{
+    RgbaImage,
+    Rgba
+};
+
 #[repr(i8)]
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, Default)]
 #[cfg_attr(feature = "serde", derive(Serialize_repr, Deserialize_repr))]
@@ -90,6 +96,22 @@ impl Display for Color {
         match self {
             Color::Paletted {x, y} => write!(f, "({x}, {y})"),
             Color::RGB {r, g, b} => write!(f, "#{r:02X}{g:02X}{b:02X}")
+        }
+    }
+}
+
+#[cfg(feature = "assets")]
+#[cfg(feature = "rendering")]
+impl Color {
+    /// Transform a color into an RGBA pixel.
+    /// 
+    /// Returns [`None`] if this is a paletted color and the index is outside of the palette.
+    pub fn into_rgba(self, palette: RgbaImage) -> Option<Rgba<u8>> {
+        match self {
+            Color::Paletted { x, y } => 
+                palette.get_pixel_checked(x as u32, y as u32).copied(),
+            Color::RGB { r, g, b } =>
+                Some(Rgba([r, g, b, 0]))
         }
     }
 }
