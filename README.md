@@ -16,5 +16,3 @@ TODO:
 - [x] Variant data
 - [ ] Renderer (should give back individual sprites as a `Scene`)
 - [ ] Bot wrapping
-
-https://github.com/balt-dev/chilly

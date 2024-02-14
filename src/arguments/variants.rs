@@ -210,7 +210,7 @@ variants! {
         },
         {
             Displace,
-            ["disp", "d", "displace"],
+            ["disp", "displace"],
             "Displaces a tile's position by a specified amount of pixels.",
             [isize, isize]
         }

@@ -3,6 +3,7 @@
 use std::str::FromStr;
 use anyhow::anyhow;
 use crate::database::structures::Color;
+use crate::arguments::Variant;
 
 mod sealed {
     use crate::database::structures::Color;
@@ -15,6 +16,7 @@ mod sealed {
     impl Sealed for isize {}
     impl Sealed for f32 {}
     impl Sealed for Color {}
+    impl Sealed for String {}
     impl<T: Sealed> Sealed for Option<T> {}
     impl<T: Sealed> Sealed for Vec<T> {}
     impl<const N: usize, T: Sealed> Sealed for [T; N] {}
@@ -141,5 +143,5 @@ arg_unit_enum!{
 }
 
 arg_from_str! {
-    u8 f32 isize Color
+    u8 f32 isize Color String
 }

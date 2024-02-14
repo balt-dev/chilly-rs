@@ -130,6 +130,18 @@ flags! {
         ["letters", "let"],
         "Defaults to using letters for text generation.",
         []
+    },
+    {
+        Palette,
+        ["p", "pal", "palette"],
+        "Specifies a palette to use for a scene.",
+        [String]
+    },
+    {
+        NoLoop,
+        ["nl", "noloop"],
+        "Prevents the rendered scene from looping.",
+        []
     }
 }
 

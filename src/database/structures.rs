@@ -100,13 +100,12 @@ impl Display for Color {
     }
 }
 
-#[cfg(feature = "assets")]
 #[cfg(feature = "rendering")]
 impl Color {
     /// Transform a color into an RGBA pixel.
     /// 
     /// Returns [`None`] if this is a paletted color and the index is outside of the palette.
-    pub fn into_rgba(self, palette: RgbaImage) -> Option<Rgba<u8>> {
+    pub fn into_rgba(self, palette: &RgbaImage) -> Option<Rgba<u8>> {
         match self {
             Color::Paletted { x, y } => 
                 palette.get_pixel_checked(x as u32, y as u32).copied(),
