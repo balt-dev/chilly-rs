@@ -3,6 +3,7 @@
 
 use crate::{database::structures::Color, solidify::{SkeletalScene, TileSkeleton, TileSkeletonType}, structures::Position};
 use image::{io::Reader as ImageReader, Rgba, RgbaImage};
+use pest::Span;
 use try_insert_ext::EntryInsertExt;
 use std::{
     borrow::Cow,
@@ -18,7 +19,13 @@ pub use structures::{RenderedScene, RenderingError};
 use self::structures::{RawSprite, Sprite};
 
 /// Opens an image, potentially from a cache.
-/// This will always return a borrow if given a cache, and always return something owned if not.
+/// 
+/// # Note
+/// You may have lifetime issues with this funciton. 
+/// 
+/// The pointer for a borrow would dangle or break aliasing rules if the cache is changed after returning,
+/// so before any subsequent calls, you must clone the values you get from this function,
+/// or drop the return value entirely.
 fn open_cached(
     path: impl AsRef<Path>,
     cache: Option<&mut HashMap<PathBuf, RgbaImage>>,
@@ -112,13 +119,31 @@ pub fn render<'scene, 'cache>(
         "default".into()
     };
 
-    let wobble_frames = if let Some(flag) = scene.flags.remove(&FlagName::DecoupleWobble) {
-        let Flag::DecoupleWobble(anim, wobble) = flag else {
+    let frame_indices = if let Some(flag) = scene.flags.remove(&FlagName::WobbleFrames) {
+        let Flag::WobbleFrames(wobbles) = flag else {
             unreachable!()
         };
-        (anim, wobble)
+        if wobbles.is_empty() {
+            return Err(RenderingError::InvalidFlag(FlagName::WobbleFrames, "must have at least one wobble frame".into()))
+        }
+        if wobbles.iter().any(|frame| !(1..=3).contains(frame)) {
+            return Err(RenderingError::InvalidFlag(FlagName::WobbleFrames, "all wobble frames must be between 1 and 3".into()))
+        }
+        wobbles
     } else {
-        (3, 1)
+        vec![1, 2, 3]
+    };
+
+    let anim_frames_per_wobble = if let Some(flag) = scene.flags.remove(&FlagName::DecoupleWobble) {
+        let Flag::DecoupleWobble(anim, _) = flag else {
+            unreachable!()
+        };
+        if anim == 0 {
+            return Err(RenderingError::InvalidFlag(FlagName::DecoupleWobble, "cannot have 0 animation frames per wobble frame (would lead to div. by 0)".into()))
+        }
+        anim as usize
+    } else {
+        frame_indices.len()
     };
 
     let palette = cache.as_ref().and_then(|cache| cache.get(&palette_path));
@@ -142,11 +167,14 @@ pub fn render<'scene, 'cache>(
                 .into_rgba(palette.as_ref())
         })
         .unwrap_or(Rgba([0; 4]));
+
+    // See the documentation for open_cached for why we do this
+    let palette = palette.into_owned();
     
     // Convert all tile skeletons to sprites
     let sprites = scene.map.objects.into_iter()
         .map(|(pos, skel)| handle_sprite(
-            asset_path, cache, pos, skel, wobble_frames
+            asset_path, cache, pos, skel, anim_frames_per_wobble, frame_indices
         ))
         .collect::<Result<Vec<Sprite>, _>>()?;
     todo!()
@@ -161,21 +189,50 @@ fn handle_sprite<'path, 'cache, 'scene>(
     cache: Option<&'cache mut HashMap<PathBuf, RgbaImage>>,
     pos: Position<usize>,
     skel: TileSkeleton,
-    wobble_frames: (u8, u8)
+    anim_frames_per_wobble: usize,
+    frame_indices: Vec<u8>
 ) -> Result<Sprite<'cache>, RenderingError<'scene>> {
-    let frame = pos.t;
+    let time_index = pos.t;
+    let frame_index = (time_index / anim_frames_per_wobble) % frame_indices.len();
+    // Due to doing % len, this is guaranteed to exist,
+    // unless we're given a length of 0, which is handled in the flag parsing
+    let wobble_frame = frame_indices[frame_index];
 
     let sprite = match skel.data {
         TileSkeletonType::Existing(existing) => {
-            // Get the frames of the sprite
+            // Construct the sprite path
             let sprite_name = &existing.sprite;
             let mut sprite_path = asset_path.to_path_buf();
             sprite_path.push(&existing.directory);
             sprite_path.push("sprites");
-            sprite_path.push(&existing.sprite);
-            open_cached(, cache)
+            // Create a fallback path to check if the current path doesn't exist
+            let mut fallback_path = sprite_path.clone();
+            sprite_path.push(format!("{}_{}_{}.png", existing.sprite, skel.animation_frame.0, wobble_frame));
+            fallback_path.push(format!("{}_{}_{}.png", existing.sprite, skel.animation_frame.1, wobble_frame));
+            match open_cached(&sprite_path, cache) {
+                // Found the default sprite - return it
+                Ok(v) => RawSprite {
+                    image: v.into_owned(),
+                    color: existing.color
+                },
+                // Couldn't find default sprite - try the fallback
+                Err(e) if e.kind() == io::ErrorKind::NotFound => {
+                    let fallback = open_cached(fallback_path, cache)
+                        .map_err(|e| RenderingError::SpriteFailedOpen(skel.span, e))?.into_owned();
+                    // Add the fallback to the cache in the original's stead
+                    if let Some(cache) = cache {
+                        cache.insert(sprite_path, fallback);
+                    }
+                    RawSprite {
+                        image: fallback,
+                        color: existing.color
+                    }
+                },
+                // Found it, but something else happened - reraise
+                Err(e) => return Err(RenderingError::SpriteFailedOpen(skel.span, e))
+            }
         },
-        TileSkeletonType::Generative(gen) => generate_sprite(asset_path, cache, gen)?
+        TileSkeletonType::Generative(gen) => generate_sprite(asset_path, cache, gen, skel.span)?
     };
 
     todo!()
@@ -185,7 +242,8 @@ fn handle_sprite<'path, 'cache, 'scene>(
 fn generate_sprite<'path, 'cache, 'scene>(
     path: &'path Path,
     cache: Option<&'cache mut HashMap<PathBuf, RgbaImage>>,
-    genstring: String
-) -> Result<RawSprite<'cache>, RenderingError<'scene>> {
-    Err(RenderingError::NoTile(genstring))
+    genstring: Cow<'scene, str>,
+    span: Span<'scene>
+) -> Result<RawSprite, RenderingError<'scene>> {
+    Err(RenderingError::SpriteNoTile(span, genstring))
 }

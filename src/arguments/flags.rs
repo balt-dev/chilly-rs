@@ -50,6 +50,12 @@ arg_macro! {
                 and the second is the number of render frames to wait for the next animation frame.
             ",
             [u8, u8]
+        },
+        {
+            WobbleFrames,
+            ["f", "frames"],
+            "Sets the order of wobble frames to use for the scene. M",
+            [Vec<u8>]
         }
     ],
     aliases: []

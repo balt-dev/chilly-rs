@@ -171,13 +171,24 @@ pub fn parse(scene: &str) -> Result<RawScene, Error<Rule>> {
             let Ok(flag) = flag else {return Some(Err(flag.unwrap_err()))};
             Some(Ok((identifier, flag)))
         }).collect::<Result<_, _>>()?;
+    
+    // Check if we need to repeat tiles
+    let wobble_frames = if let Some(flag) = flags.get(&FlagName::DecoupleWobble) {
+        let Flag::DecoupleWobble(_, wobble) = flag else { unreachable!() };
+        usize::from(*wobble)
+    } else {
+        1
+    };
+
     // Iterator over iterators over (Position, Pair<Rule>)
     let tilemap_iter = raw_scene.next().unwrap()
         .into_inner().enumerate().flat_map(|(y, row)|
         row.into_inner().enumerate().flat_map(move |(x, stack)|
             stack.into_inner().enumerate().map(move |(z, animation)|
-                animation.into_inner().enumerate().map(move |(t, cell)|
-                    (Position {x, y, z, t}, cell)
+                animation.into_inner().enumerate().flat_map(move |(t, cell)|
+                    (0..wobble_frames).map( |i|
+                        (Position {x, y, z, t: t * wobble_frames + i}, cell)
+                    )
                 )
             )
         )

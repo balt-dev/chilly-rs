@@ -61,7 +61,7 @@ pub enum RenderingError<'scene> {
     /// Failed to open a sprite for a tile.
     SpriteFailedOpen(Span<'scene>, io::Error),
     /// The given tile doesn't exist.
-    SpriteNoTile(Span<'scene>, String),
+    SpriteNoTile(Span<'scene>, Cow<'scene, str>),
     /// Couldn't find a palette.
     SpriteNoPalette(Span<'scene>, PathBuf),
     /// Failed to decode an image.
@@ -72,6 +72,8 @@ pub enum RenderingError<'scene> {
     FailedOpen(PathBuf, io::Error),
     /// Failed to decode an image.
     FailedDecode(PathBuf, ImageError),
+    /// A flag's arguments were invalid.
+    InvalidFlag(FlagName, String)
 }
 
 macro_rules! spanned_err {
@@ -98,13 +100,25 @@ impl<'scene> Display for RenderingError<'scene> {
                      error: {err}"
                 ),
             RenderingError::SpriteNoTile(span, err) => 
-            spanned_err!(
-                f, span, 
-                "couldn't open a sprite for this tile\n\
-                 error: {err}"
-            ),
-            RenderingError::SpriteNoPalette(_, _) => todo!(),
-            RenderingError::SpriteFailedDecode(_, _, _) => todo!(),
+                spanned_err!(
+                    f, span, 
+                    "couldn't open a sprite for this tile\n\
+                    error: {err}"
+                ),
+            RenderingError::SpriteNoPalette(span, pal_name) => 
+                spanned_err!(
+                    f, span, 
+                    "couldn't find a palette named \"{}\" for this tile",
+                    pal_name.display()
+                ),
+            RenderingError::SpriteFailedDecode(span, path, err) =>
+                spanned_err!(
+                    f, span, 
+                    "failed to decode the sprite at \"{}\" for this tile\n\
+                     this usually indicates broken assets\n\
+                     error: {err}",
+                    path.display()
+                ),
             RenderingError::NoPalette(path) => write!(
                 f, "couldn't find a palette named {}", path.display()
             ),
@@ -112,12 +126,14 @@ impl<'scene> Display for RenderingError<'scene> {
                 write!(f, "failed to open \"{}\": {err}", path.display()),
             RenderingError::FailedDecode(path, err) =>
                 write!(f, "failed to decode image at \"{}\": {err}", path.display()),
+            RenderingError::InvalidFlag(flag_name, message) =>
+                write!(f, "flag {} raised an error: {message}", flag_name.to_string()),
         }
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct RawSprite<'cache> {
-    pub(crate) image: Cow<'cache, RgbaImage>,
+pub(crate) struct RawSprite {
+    pub(crate) image: RgbaImage,
     pub(crate) color: Color
 }
