@@ -10,7 +10,7 @@ pub use structures::{
 
 use std::{
     borrow::Cow,
-    collections::{HashMap, HashSet}
+    collections::HashMap
 };
 use itertools::Itertools;
 use num_traits::Num;
@@ -19,9 +19,12 @@ use pest::{
     iterators::Pair,
     Parser
 };
-use crate::{arguments::{Flag, FlagName}, structures::{
-    ObjectMap, Position
-}};
+use crate::{
+    arguments::{Flag, FlagName},
+    structures::{
+        ObjectMap, Position
+    }
+};
 
 mod scene {
     #![allow(missing_docs)]
@@ -126,7 +129,7 @@ fn unescape(string: &str) -> Cow<str> {
 ///
 /// # Errors
 /// Errors if the scene fails to parse.
-#[allow(clippy::result_large_err, clippy::missing_panics_doc)]
+#[allow(clippy::result_large_err, clippy::missing_panics_doc, clippy::too_many_lines)]
 pub fn parse(scene: &str) -> Result<RawScene, Error<Rule>> {
     // I'll be perfectly honest here.
     // Using pest here is overkill.

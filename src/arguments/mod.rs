@@ -1,11 +1,15 @@
+//! Handles parsing of different structures with typed arguments.
+
 mod flags;
 mod variants;
-mod arguments;
+mod args;
+mod argmacro;
 
 pub use flags::*;
 use thiserror::Error;
 pub use variants::*;
-pub use arguments::*;
+pub use args::*;
+pub(crate) use argmacro::arg_macro;
 
 use displaydoc::Display;
 

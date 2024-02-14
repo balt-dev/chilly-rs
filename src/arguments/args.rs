@@ -3,7 +3,6 @@
 use std::str::FromStr;
 use anyhow::anyhow;
 use crate::database::structures::Color;
-use crate::arguments::Variant;
 
 mod sealed {
     use crate::database::structures::Color;

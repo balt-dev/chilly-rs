@@ -105,10 +105,11 @@ impl Color {
     /// Transform a color into an RGBA pixel.
     /// 
     /// Returns [`None`] if this is a paletted color and the index is outside of the palette.
+    #[must_use]
     pub fn into_rgba(self, palette: &RgbaImage) -> Option<Rgba<u8>> {
         match self {
             Color::Paletted { x, y } => 
-                palette.get_pixel_checked(x as u32, y as u32).copied(),
+                palette.get_pixel_checked(u32::from(x), u32::from(y)).copied(),
             Color::RGB { r, g, b } =>
                 Some(Rgba([r, g, b, 0]))
         }

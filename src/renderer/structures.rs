@@ -4,16 +4,13 @@ use std::{
     collections::HashMap
 };
 use std::borrow::Cow;
-use std::cmp::Ordering;
-use std::collections::BTreeSet;
-use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::time::Duration;
 
 use image::{ImageError, Rgba, RgbaImage};
 use pest::{error::ErrorVariant, Span};
 use thiserror::Error;
-use crate::arguments::{FlagName, Flag};
+use crate::{arguments::{Flag, FlagName}, database::structures::Color};
 
 
 /// A rendered scene, ready to be passed back to the renderer implementation.
@@ -34,7 +31,7 @@ pub struct RenderedScene<'cache> {
 }
 
 /// A single frame of a rendered scene.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct SceneFrame<'cache> {
     /// The length of this frame.
     pub length: Duration,
@@ -55,7 +52,7 @@ pub struct Sprite<'cache> {
     /// The pixel position of this sprite in the frame.
     pub position: (isize, isize),
     /// The sprite's image.
-    pub sprite: Cow<'cache, RgbaImage>
+    pub image: Cow<'cache, RgbaImage>
 }
 
 #[derive(Debug, Error)]
@@ -63,29 +60,51 @@ pub struct Sprite<'cache> {
 pub enum RenderingError<'scene> {
     /// Failed to open a sprite for a tile.
     SpriteFailedOpen(Span<'scene>, io::Error),
+    /// The given tile doesn't exist.
+    SpriteNoTile(Span<'scene>, String),
     /// Couldn't find a palette.
+    SpriteNoPalette(Span<'scene>, PathBuf),
+    /// Failed to decode an image.
+    SpriteFailedDecode(Span<'scene>, PathBuf, ImageError),
+    /// Couldn't find a palette for the scene.
     NoPalette(PathBuf),
-    // Failed to open something that isn't a sprite.
+    /// Failed to open something that isn't a sprite.
     FailedOpen(PathBuf, io::Error),
-    // Failed to decode an image.
+    /// Failed to decode an image.
     FailedDecode(PathBuf, ImageError),
+}
+
+macro_rules! spanned_err {
+    ($f: ident, $span: ident, $($message: tt)+) => {
+        write!(
+            $f, "{}",
+            pest::error::Error::<crate::parser::Rule>::new_from_span(
+                ErrorVariant::CustomError {
+                    message: format!($($message)+)
+                },
+                *$span
+            )
+        )
+    }
 }
 
 impl<'scene> Display for RenderingError<'scene> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            RenderingError::SpriteFailedOpen(span, err) => write!(
-                f, "{}",
-                pest::error::Error::<crate::parser::Rule>::new_from_span(
-                    ErrorVariant::CustomError {
-                        message: format!("\
-                            failed to open sprite files for this tile\n\
-                            error: {err}\
-                        ")
-                    },
-                    *span
-                )
+            RenderingError::SpriteFailedOpen(span, err) => 
+                spanned_err!(
+                    f, span, 
+                    "couldn't open a sprite for this tile\n\
+                     error: {err}"
+                ),
+            RenderingError::SpriteNoTile(span, err) => 
+            spanned_err!(
+                f, span, 
+                "couldn't open a sprite for this tile\n\
+                 error: {err}"
             ),
+            RenderingError::SpriteNoPalette(_, _) => todo!(),
+            RenderingError::SpriteFailedDecode(_, _, _) => todo!(),
             RenderingError::NoPalette(path) => write!(
                 f, "couldn't find a palette named {}", path.display()
             ),
@@ -95,4 +114,10 @@ impl<'scene> Display for RenderingError<'scene> {
                 write!(f, "failed to decode image at \"{}\": {err}", path.display()),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RawSprite<'cache> {
+    pub(crate) image: Cow<'cache, RgbaImage>,
+    pub(crate) color: Color
 }

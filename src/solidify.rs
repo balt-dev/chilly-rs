@@ -1,7 +1,7 @@
 //! Holds methods and structures relating to solidifying a [`RawScene`] into a [`SkeletalScene`].
 
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::{borrow::Cow, collections::{BTreeMap, HashMap, HashSet}};
 use pest::Span;
 use rand::seq::SliceRandom;
 
@@ -75,7 +75,14 @@ impl<'scene> RawScene<'scene> {
     /// This can be disabled by leaving `easter_egg_tiles` empty.
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn solidify<'db>(self, db: &'db Database, default: &TileDefault, easter_egg_tiles: &HashSet<String>) -> SkeletalScene<'db, 'scene> {
+    pub fn solidify<'db, 'easter_eggs: 'db>(
+        self, 
+        db: &'db Database, 
+        default: &TileDefault, 
+        easter_egg_tiles: &'easter_eggs HashSet<String>
+    ) 
+        -> SkeletalScene<'db, 'scene>
+    {
         let mut flags = self.flags;
         // Detect flags
         let connect_corners = flags.remove(&FlagName::ConnectBorders).is_some();
@@ -95,19 +102,22 @@ impl<'scene> RawScene<'scene> {
             // Transform the name into its canonical representation
             let name = match (tile.tag, &default) {
                 (Some(TileTag::Text), &TileDefault::Text) =>
-                    tile.name.strip_prefix("text_").unwrap_or(tile.name).to_string(),
-                (Some(TileTag::Text), _) | (None, &TileDefault::Text) =>
-                    format!("text_{}", tile.name),
+                    Cow::Borrowed(tile.name.strip_prefix("text_").unwrap_or(tile.name)),
                 (Some(TileTag::Glyph), &TileDefault::Glyph) =>
-                    tile.name.strip_prefix("glyph_").unwrap_or(tile.name).to_string(),
-                (Some(TileTag::Glyph), _) | (None, &TileDefault::Glyph) =>
-                    format!("glyph_{}", tile.name),
+                    Cow::Borrowed(tile.name.strip_prefix("glyph_").unwrap_or(tile.name)),
                 (None, &TileDefault::Tile) =>
-                    tile.name.to_string()
+                    Cow::Borrowed(tile.name),
+                (Some(TileTag::Text), _) | (None, &TileDefault::Text) =>
+                    Cow::Owned(format!("text_{}", tile.name)),
+                (Some(TileTag::Glyph), _) | (None, &TileDefault::Glyph) =>
+                    Cow::Owned(format!("glyph_{}", tile.name)),
             };
             (*pos, name)
         }).collect::<BTreeMap<_, _>>();
         scene.map.objects = name_map.iter().map(|(pos, mut name)| {
+            // Cloning is necessary due to needing to look at the name map again,
+            // and cloning a Cow::Borrowed (most cases) is cheap
+            let mut name = name.clone();
             let pos = *pos;
             let tile = map.objects.remove(&pos).expect("positions from name map should sync with positions in tile map");
             // Apply animation frame-level variants
@@ -170,11 +180,11 @@ impl<'scene> RawScene<'scene> {
                     else {
                         break 'handle_2
                     };
-                    name = chosen_name;
+                    name = Cow::Borrowed(chosen_name.as_str());
                 }
             }
 
-            if let Some(data) = db.tiles.get(name) {
+            if let Some(data) = db.tiles.get(name.as_ref()) {
                 if anim_frame.is_none() && data.tiling == Tiling::AutoTiled {
                     // Find the neighbors of this tile
                     let mut neighbors = TileNeighbors::empty();
@@ -200,7 +210,7 @@ impl<'scene> RawScene<'scene> {
                 })
             } else {
                 (pos, TileSkeleton {
-                    data: TileSkeletonType::Generative(name.clone()),
+                    data: TileSkeletonType::Generative(name),
                     animation_frame: anim_frame.unwrap_or_default(),
                     variants: new_variants,
                     span: tile.span
@@ -213,18 +223,18 @@ impl<'scene> RawScene<'scene> {
 
 /// The type of a [`TileSkeleton`].
 #[derive(Debug, Clone, PartialEq)]
-pub enum TileSkeletonType<'db> {
+pub enum TileSkeletonType<'db, 'scene> {
     /// Backed by database data
     Existing(&'db TileData),
     /// Does not exist, may need to be generated
-    Generative(String)
+    Generative(Cow<'scene, str>)
 }
 
 /// A single tile, after tile-level parsing efforts have been made.
 #[derive(Debug, Clone, PartialEq)]
 pub struct TileSkeleton<'db, 'scene> {
     /// The backing data of this tile.
-    pub data: TileSkeletonType<'db>,
+    pub data: TileSkeletonType<'db, 'scene>,
     /// The animation frame that this tile has, with a fallback if the sprite for it doesn't exist.
     pub animation_frame: (u8, u8),
     /// The variants that this tile has.
