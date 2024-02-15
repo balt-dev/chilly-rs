@@ -51,6 +51,8 @@ impl Database {
             .map(|c| Ok(c?.path()))
             // Filter to only the directories
             .filter_ok(|path| path.is_dir())
+            // Filter out the general assets directory
+            .filter_ok(|path| path.file_name().is_some_and(|str| str.to_str() != Some("general")))
             // Load each directory
             .try_for_each(|res| res.and_then(|path| self.load_custom_path(path)))
     }

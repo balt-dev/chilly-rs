@@ -12,6 +12,7 @@ mod sealed {
     impl Sealed for MetaKernel {}
     impl Sealed for TilingDirection {}
     impl Sealed for u8 {}
+    impl Sealed for i8 {}
     impl Sealed for isize {}
     impl Sealed for f32 {}
     impl Sealed for Color {}
@@ -115,6 +116,7 @@ pub enum MetaKernel {
     Unit
 }
 
+
 /// A tiling direction for a tile to connect to. Used in [`Variant::Tiling`].
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 #[allow(missing_docs)]
@@ -142,5 +144,5 @@ arg_unit_enum!{
 }
 
 arg_from_str! {
-    u8 f32 isize Color String
+    u8 i8 f32 isize Color String
 }

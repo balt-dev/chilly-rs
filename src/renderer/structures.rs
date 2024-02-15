@@ -11,6 +11,7 @@ use image::{ImageError, Rgba, RgbaImage};
 use pest::{error::ErrorVariant, Span};
 use thiserror::Error;
 use crate::{arguments::{Flag, FlagName}, database::structures::Color};
+use crate::arguments::VariantName;
 
 
 /// A rendered scene, ready to be passed back to the renderer implementation.
@@ -61,11 +62,13 @@ pub enum RenderingError<'scene> {
     /// Failed to open a sprite for a tile.
     SpriteFailedOpen(Span<'scene>, io::Error),
     /// The given tile doesn't exist.
-    SpriteNoTile(Span<'scene>, Cow<'scene, str>),
+    SpriteNoTile(Span<'scene>, String),
     /// Couldn't find a palette.
     SpriteNoPalette(Span<'scene>, PathBuf),
     /// Failed to decode an image.
     SpriteFailedDecode(Span<'scene>, PathBuf, ImageError),
+    /// A variant failed to compute.
+    SpriteInvalidVariant(Span<'scene>, VariantName, String),
     /// Couldn't find a palette for the scene.
     NoPalette(PathBuf),
     /// Failed to open something that isn't a sprite.
@@ -73,7 +76,7 @@ pub enum RenderingError<'scene> {
     /// Failed to decode an image.
     FailedDecode(PathBuf, ImageError),
     /// A flag's arguments were invalid.
-    InvalidFlag(FlagName, String)
+    InvalidFlag(FlagName, String),
 }
 
 macro_rules! spanned_err {
@@ -119,9 +122,10 @@ impl<'scene> Display for RenderingError<'scene> {
                      error: {err}",
                     path.display()
                 ),
-            RenderingError::NoPalette(path) => write!(
-                f, "couldn't find a palette named {}", path.display()
-            ),
+            RenderingError::SpriteInvalidVariant(span, name, err) =>
+                spanned_err!(f, span, "failed to apply variant {name}: {err}"),
+            RenderingError::NoPalette(path) =>
+                write!(f, "couldn't find a palette named {}", path.display()),
             RenderingError::FailedOpen(path, err) =>
                 write!(f, "failed to open \"{}\": {err}", path.display()),
             RenderingError::FailedDecode(path, err) =>

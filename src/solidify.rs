@@ -75,7 +75,7 @@ impl<'scene> RawScene<'scene> {
     /// This can be disabled by leaving `easter_egg_tiles` empty.
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn solidify<'db, 'easter_eggs: 'db>(
+    pub fn solidify<'db: 'scene, 'easter_eggs: 'db>(
         self, 
         db: &'db Database, 
         default: &TileDefault, 
@@ -114,7 +114,7 @@ impl<'scene> RawScene<'scene> {
             };
             (*pos, name)
         }).collect::<BTreeMap<_, _>>();
-        scene.map.objects = name_map.iter().map(|(pos, mut name)| {
+        scene.map.objects = name_map.iter().map(|(pos, name)| {
             // Cloning is necessary due to needing to look at the name map again,
             // and cloning a Cow::Borrowed (most cases) is cheap
             let mut name = name.clone();

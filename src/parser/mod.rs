@@ -173,9 +173,9 @@ pub fn parse(scene: &str) -> Result<RawScene, Error<Rule>> {
         }).collect::<Result<_, _>>()?;
     
     // Check if we need to repeat tiles
-    let wobble_frames = if let Some(flag) = flags.get(&FlagName::DecoupleWobble) {
-        let Flag::DecoupleWobble(_, wobble) = flag else { unreachable!() };
-        usize::from(*wobble)
+    let frames_per_step = if let Some(flag) = flags.get(&FlagName::DecoupleWobble) {
+        let Flag::DecoupleWobble(step, _) = flag else { unreachable!() };
+        usize::from(*step)
     } else {
         1
     };
@@ -186,8 +186,8 @@ pub fn parse(scene: &str) -> Result<RawScene, Error<Rule>> {
         row.into_inner().enumerate().flat_map(move |(x, stack)|
             stack.into_inner().enumerate().map(move |(z, animation)|
                 animation.into_inner().enumerate().flat_map(move |(t, cell)|
-                    (0..wobble_frames).map( |i|
-                        (Position {x, y, z, t: t * wobble_frames + i}, cell)
+                    (0..frames_per_step).map( move |i|
+                        (Position {x, y, z, t: t * frames_per_step + i}, cell.clone())
                     )
                 )
             )

@@ -21,7 +21,7 @@ arg_macro! {
            "Adds an outline to a tile's sprite.\n\
             Optionally, it can be specified how many times to outline, \
             an outline kernel to use, and an outline size.",
-            [Option<u8>, Option<MetaKernel>, Option<u8>]
+            [Option<i8>, Option<MetaKernel>, Option<u8>]
         },
         {
             Noop,

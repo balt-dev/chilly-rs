@@ -7,6 +7,7 @@ This is my third attempt at rewriting RIC.
 
 I've decided to switch to Rust for this, as I enjoy the language more.
 
+In the `assets` folder, you can find a sample layout of the directory structure for Chilly's assets.
 
 ---
 
